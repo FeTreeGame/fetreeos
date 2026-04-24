@@ -1,7 +1,59 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, emptyTrash, updateNode, type FSNode } from './fileSystem';
+
+const CELL_W = 90;
+const CELL_H = 90;
+const ICON_POS_KEY = 'fetree-icon-positions';
+
+type IconPositions = Record<string, { col: number; row: number }>;
+
+function loadIconPositions(): IconPositions {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(ICON_POS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveIconPositions(positions: IconPositions): void {
+  localStorage.setItem(ICON_POS_KEY, JSON.stringify(positions));
+}
+
+function autoPlace(
+  items: { id: string }[],
+  existing: IconPositions,
+  cols: number,
+  rows: number,
+): IconPositions {
+  const result: IconPositions = {};
+  const occupied = new Set<string>();
+
+  for (const item of items) {
+    const pos = existing[item.id];
+    if (pos && pos.col < cols && pos.row < rows) {
+      const key = `${pos.col},${pos.row}`;
+      if (!occupied.has(key)) {
+        result[item.id] = pos;
+        occupied.add(key);
+        continue;
+      }
+    }
+    let placed = false;
+    for (let c = 0; c < cols && !placed; c++) {
+      for (let r = 0; r < rows && !placed; r++) {
+        const key = `${c},${r}`;
+        if (!occupied.has(key)) {
+          result[item.id] = { col: c, row: r };
+          occupied.add(key);
+          placed = true;
+        }
+      }
+    }
+  }
+  return result;
+}
 
 interface FileExplorerProps {
   mode?: 'desktop' | 'explorer';
@@ -21,6 +73,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
+  const [iconPositions, setIconPositions] = useState<IconPositions>({});
+
   const refresh = useCallback(() => {
     setItems(getChildren(currentFolder));
     onFSChange?.();
@@ -28,6 +84,29 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { if (refreshKey !== undefined) setItems(getChildren(currentFolder)); }, [refreshKey, currentFolder]);
+
+  useEffect(() => {
+    if (!isDesktop || !contentRef.current) return;
+    const el = contentRef.current;
+    const measure = () => {
+      const cols = Math.max(1, Math.floor(el.clientWidth / CELL_W));
+      const rows = Math.max(1, Math.floor(el.clientHeight / CELL_H));
+      setGridSize({ cols, rows });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isDesktop]);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    const allItems = [...items, { id: '__trash__' }];
+    const saved = loadIconPositions();
+    const placed = autoPlace(allItems, saved, gridSize.cols, gridSize.rows);
+    setIconPositions(placed);
+    saveIconPositions(placed);
+  }, [isDesktop, items, gridSize]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);
@@ -124,26 +203,109 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
       {/* Content */}
       <div
-        className={`flex-1 overflow-auto ${isDesktop ? 'p-4' : 'p-3'}`}
+        ref={contentRef}
+        className={`flex-1 overflow-auto ${isDesktop ? '' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
       >
         {items.length === 0 && !isDesktop ? (
           <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
+        ) : isDesktop ? (
+          <div className="relative w-full h-full">
+            {/* Grid debug overlay */}
+            {Array.from({ length: gridSize.cols * gridSize.rows }, (_, i) => {
+              const col = i % gridSize.cols;
+              const row = Math.floor(i / gridSize.cols);
+              return (
+                <div
+                  key={`grid-${i}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: col * CELL_W,
+                    top: row * CELL_H,
+                    width: CELL_W,
+                    height: CELL_H,
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                />
+              );
+            })}
+            {items.map(node => {
+              const pos = iconPositions[node.id];
+              if (!pos) return null;
+              return (
+                <button
+                  key={node.id}
+                  className="absolute flex flex-col items-center justify-center rounded hover:bg-white/10 transition-colors"
+                  style={{
+                    left: pos.col * CELL_W,
+                    top: pos.row * CELL_H,
+                    width: CELL_W,
+                    height: CELL_H,
+                    padding: 6,
+                  }}
+                  onDoubleClick={() => handleDoubleClick(node)}
+                  onContextMenu={(e) => handleContextMenu(e, node)}
+                >
+                  <span className="text-3xl">{getIconForNode(node)}</span>
+                  {renaming === node.id ? (
+                    <input
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(null); }}
+                      className="w-full text-[10px] text-center bg-zinc-800 text-white border border-blue-500 outline-none rounded px-1 mt-1"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      {node.name}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {/* Trash */}
+            {(() => {
+              const pos = iconPositions['__trash__'];
+              if (!pos) return null;
+              return (
+                <button
+                  className="absolute flex flex-col items-center justify-center rounded hover:bg-white/10 transition-colors"
+                  style={{
+                    left: pos.col * CELL_W,
+                    top: pos.row * CELL_H,
+                    width: CELL_W,
+                    height: CELL_H,
+                    padding: 6,
+                  }}
+                  onDoubleClick={() => {
+                    const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
+                    onOpenFile?.(trashNode);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextMenu({ x: e.clientX, y: e.clientY, node: { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' } as FSNode });
+                  }}
+                >
+                  <span className="text-3xl">🗑️</span>
+                  <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    휴지통
+                  </span>
+                </button>
+              );
+            })()}
+          </div>
         ) : (
-          <div className={isDesktop
-            ? 'flex flex-col flex-wrap gap-2 content-start h-full'
-            : 'grid grid-cols-4 gap-1'
-          }>
+          <div className="grid grid-cols-4 gap-1">
             {items.map(node => (
               <button
                 key={node.id}
-                className={`flex flex-col items-center rounded hover:bg-white/10 transition-colors ${
-                  isDesktop ? 'w-20 p-2' : 'p-2'
-                }`}
+                className="flex flex-col items-center p-2 rounded hover:bg-white/10 transition-colors"
                 onDoubleClick={() => handleDoubleClick(node)}
                 onContextMenu={(e) => handleContextMenu(e, node)}
               >
-                <span className={isDesktop ? 'text-3xl' : 'text-2xl'}>{getIconForNode(node)}</span>
+                <span className="text-2xl">{getIconForNode(node)}</span>
                 {renaming === node.id ? (
                   <input
                     value={renameValue}
@@ -154,35 +316,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     autoFocus
                   />
                 ) : (
-                  <span className={`mt-1 text-center leading-tight truncate w-full ${
-                    isDesktop
-                      ? 'text-[11px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
-                      : 'text-[10px] text-zinc-300'
-                  }`}>
+                  <span className="text-[10px] text-zinc-300 mt-1 text-center leading-tight truncate w-full">
                     {node.name}
                   </span>
                 )}
               </button>
             ))}
-            {isDesktop && (
-              <button
-                className="flex flex-col items-center w-20 p-2 rounded hover:bg-white/10 transition-colors"
-                onDoubleClick={() => {
-                  const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
-                  onOpenFile?.(trashNode);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setContextMenu({ x: e.clientX, y: e.clientY, node: { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' } as FSNode });
-                }}
-              >
-                <span className="text-3xl">🗑️</span>
-                <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                  휴지통
-                </span>
-              </button>
-            )}
           </div>
         )}
       </div>

@@ -5,9 +5,10 @@ import { getNode, updateNode, createFile, getFilesByExtension, type FSNode } fro
 
 interface NotepadProps {
   fileId?: string;
+  onFSChange?: () => void;
 }
 
-export default function Notepad({ fileId }: NotepadProps) {
+export default function Notepad({ fileId, onFSChange }: NotepadProps) {
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('새 메모.txt');
   const [currentFileId, setCurrentFileId] = useState<string | null>(fileId ?? null);
@@ -53,7 +54,8 @@ export default function Notepad({ fileId }: NotepadProps) {
     setTitle(node.name);
     setContent('');
     setMenuOpen(null);
-  }, [currentFileId, content, title]);
+    onFSChange?.();
+  }, [currentFileId, content, title, onFSChange]);
 
   const showOpenDialog = useCallback(() => {
     if (currentFileId) updateNode(currentFileId, { content, name: title });

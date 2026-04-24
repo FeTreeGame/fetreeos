@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getChildren, createFile, createFolder, deleteNode, updateNode, type FSNode } from './fileSystem';
+import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, updateNode, type FSNode } from './fileSystem';
 
 interface FileExplorerProps {
   initialFolderId?: string;
   onOpenFile?: (node: FSNode) => void;
+  onFSChange?: () => void;
 }
 
-export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile }: FileExplorerProps) {
+export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile, onFSChange }: FileExplorerProps) {
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
   const [history, setHistory] = useState<string[]>([initialFolderId]);
@@ -19,7 +20,8 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile }
 
   const refresh = useCallback(() => {
     setItems(getChildren(currentFolder));
-  }, [currentFolder]);
+    onFSChange?.();
+  }, [currentFolder, onFSChange]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -70,7 +72,7 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile }
   }, [currentFolder, refresh]);
 
   const handleDelete = useCallback((id: string) => {
-    deleteNode(id);
+    moveToTrash(id);
     setContextMenu(null);
     refresh();
   }, [refresh]);
@@ -130,9 +132,7 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile }
                 onDoubleClick={() => handleDoubleClick(node)}
                 onContextMenu={(e) => handleContextMenu(e, node)}
               >
-                <span className="text-2xl">
-                  {node.type === 'folder' ? '📁' : node.extension === '.txt' ? '📄' : '📎'}
-                </span>
+                <span className="text-2xl">{getIconForNode(node)}</span>
                 {renaming === node.id ? (
                   <input
                     value={renameValue}
@@ -169,9 +169,11 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile }
         >
           {contextMenu.node ? (<>
             <button onClick={() => handleDoubleClick(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
-            <button onClick={() => startRename(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름 변경</button>
-            <div className="border-t border-white/10 my-0.5" />
-            <button onClick={() => handleDelete(contextMenu.node!.id)} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">삭제</button>
+            {contextMenu.node.type !== 'app' && (<>
+              <button onClick={() => startRename(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름 변경</button>
+              <div className="border-t border-white/10 my-0.5" />
+              <button onClick={() => handleDelete(contextMenu.node!.id)} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">삭제</button>
+            </>)}
           </>) : (<>
             <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 텍스트 파일</button>
             <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 폴더</button>

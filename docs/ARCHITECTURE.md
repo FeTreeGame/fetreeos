@@ -28,27 +28,59 @@
 - **아이콘**: 컨테이너가 `inset-0`으로 바탕화면 전체 차지, `flex-wrap`으로 넘침 시 다음 열.
 - **최소 크기**: `minWidth`/`minHeight` px 하한으로 과소 방어.
 
+## 파일 시스템
+
+가상 파일 시스템 (`app/fileSystem.ts`). localStorage 기반, Supabase 교체 지점 분리.
+
+```typescript
+interface FSNode {
+  id: string;
+  name: string;
+  type: 'file' | 'folder' | 'app';
+  parentId: string;   // 'desktop', 'trash', 폴더 id
+  extension?: string;
+  content?: string;
+  appId?: string;     // app 노드 → AppDef.id 매핑
+  icon?: string;
+}
+```
+
+- **바탕화면 = `getChildren('desktop')`** — 앱/파일/폴더 통합 렌더링
+- **앱 바로가기**: `type: 'app'` 노드, `initDefaultFS`에서 APPS 기반 자동 생성, 삭제 보호
+- **휴지통**: `parentId: 'trash'`로 이동, 완전 삭제는 `emptyTrash`만
+- **확장자→앱 매핑**: `.txt` → notepad, `.url` → browser
+- **FS 버전 관리**: `fetree-fs-version`으로 앱 추가 시 기존 데이터 보존
+
 ## 앱 시스템
 
-앱 정의는 `app/apps.ts`에 분리. 기본 앱(browser, notepad, settings)과 콘텐츠 앱(iframe 외부 프로젝트)을 구분.
+앱 정의는 `app/apps.ts`에 분리. 기본 앱(explorer, browser, notepad)과 콘텐츠 앱(iframe 외부 프로젝트)을 구분.
 
 ```typescript
 interface AppDef {
   id: string;
   title: string;
   icon: string;
-  type: 'browser' | 'notepad' | 'iframe' | 'empty';
-  defaultW?: number;   // px 기본 크기 (열릴 때 비율로 변환)
+  type: 'browser' | 'notepad' | 'iframe' | 'explorer' | 'empty';
+  defaultW?: number;
   defaultH?: number;
-  url?: string;        // iframe 앱의 임베드 URL
-  text?: string;       // notepad 앱의 초기 텍스트
+  url?: string;
 }
 ```
 
+- `explorer`: 파일 탐색기 — 폴더 탐색, 우클릭 메뉴, 파일/폴더 CRUD
 - `browser`: 주소창 + 게임 목록/상세 + iframe 임베드
-- `notepad`: 메뉴바 + 편집 가능 textarea
+- `notepad`: 파일 기반 편집기 — FSNode 연동, File > New/Open/Save
 - `iframe`: 외부 배포 프로젝트를 전체 크기 iframe으로 임베드 (비활성 시 pointerEvents 차단)
 - `empty`: 플레이스홀더 (미구현 앱)
+
+## 컴포넌트 구조
+
+- `Clock.tsx` — 시계 + 캘린더 팝업
+- `Notepad.tsx` — 파일 기반 텍스트 편집기
+- `FileExplorer.tsx` — 파일 탐색기
+- `ContextMenu.tsx` — 범용 우클릭 메뉴 (화면 경계 바운딩)
+
+앱 내 변경이 바탕화면에 반영되도록 `onFSChange` 콜백 패턴 사용.
 
 ## 윈도우 관리
 

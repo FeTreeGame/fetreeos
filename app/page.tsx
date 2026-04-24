@@ -5,7 +5,8 @@ import { APPS, type AppDef } from './apps';
 import Clock from './Clock';
 import Notepad from './Notepad';
 import FileExplorer from './FileExplorer';
-import { getChildren, initDefaultFS, getAppForExtension, type FSNode } from './fileSystem';
+import { getChildren, initDefaultFS, getAppForExtension, getIconForNode, moveToTrash, emptyTrash, createFile as createFileFS, createFolder as createFolderFS, type FSNode } from './fileSystem';
+import ContextMenu, { type MenuItem } from './ContextMenu';
 
 const GAMES_DATA: Record<string, { title: string; embedUrl: string }> = {
   'dog-ninja': { title: 'Dog Ninja', embedUrl: 'https://www.youtube.com/embed/iofYDsA2yqg' },
@@ -145,6 +146,7 @@ export default function Home() {
   const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const desktopRef = useRef<HTMLDivElement>(null);
 
   const topZIndex = useCallback(() => {
@@ -214,6 +216,35 @@ export default function Home() {
     initDefaultFS();
     refreshDesktop();
   }, [refreshDesktop]);
+
+  const handleDesktopContext = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setCtxMenu({
+      x: e.clientX, y: e.clientY,
+      items: [
+        { label: '새 텍스트 파일', onClick: () => { createFileFS('desktop', '새 텍스트.txt', ''); refreshDesktop(); } },
+        { label: '새 폴더', onClick: () => { createFolderFS('desktop', '새 폴더'); refreshDesktop(); } },
+        { label: '새로고침', onClick: refreshDesktop, divider: true },
+      ],
+    });
+  }, [refreshDesktop]);
+
+  const handleFileContext = useCallback((e: React.MouseEvent, node: FSNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const items: MenuItem[] = [];
+    if (node.type === 'app' && node.appId) {
+      const app = APPS.find(a => a.id === node.appId);
+      items.push({ label: '열기', onClick: () => { if (app) openApp(app); } });
+    } else if (node.type === 'folder') {
+      items.push({ label: '열기', onClick: () => openApp(APPS.find(a => a.type === 'explorer')!, node.id) });
+      items.push({ label: '휴지통으로 이동', onClick: () => { moveToTrash(node.id); refreshDesktop(); }, divider: true, danger: true });
+    } else {
+      items.push({ label: '열기', onClick: () => openFile(node) });
+      items.push({ label: '휴지통으로 이동', onClick: () => { moveToTrash(node.id); refreshDesktop(); }, divider: true, danger: true });
+    }
+    setCtxMenu({ x: e.clientX, y: e.clientY, items });
+  }, [openApp, openFile, refreshDesktop]);
 
   const closeWindow = useCallback((id: string) => {
     setWindows(prev => prev.filter(w => w.id !== id));
@@ -331,7 +362,8 @@ export default function Home() {
         ref={desktopRef}
         className="flex-1 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #1a3a4a 0%, #0d1f2d 50%, #1a2a3a 100%)' }}
-        onClick={() => { setStartMenuOpen(false); setFocusedId(null); }}
+        onClick={() => { setStartMenuOpen(false); setFocusedId(null); setCtxMenu(null); }}
+        onContextMenu={handleDesktopContext}
       >
         {/* Snap Preview */}
         {snapPreview && drag?.kind === 'move' && (
@@ -348,35 +380,49 @@ export default function Home() {
 
         {/* Desktop Icons */}
         <div className="absolute inset-0 p-4 flex flex-col flex-wrap gap-2 content-start">
-          {APPS.map(app => (
-            <button
-              key={app.id}
-              onDoubleClick={() => openApp(app)}
-              className="flex flex-col items-center w-20 p-2 rounded hover:bg-white/10 transition-colors"
-            >
-              <span className="text-3xl">{app.icon}</span>
-              <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                {app.title}
-              </span>
-            </button>
-          ))}
           {desktopFiles.map(node => (
             <button
               key={node.id}
-              onDoubleClick={() => node.type === 'folder'
-                ? openApp(APPS.find(a => a.type === 'explorer')!, node.id)
-                : openFile(node)
-              }
+              onDoubleClick={() => {
+                if (node.type === 'app' && node.appId) {
+                  const app = APPS.find(a => a.id === node.appId);
+                  if (app) openApp(app);
+                } else if (node.type === 'folder') {
+                  openApp(APPS.find(a => a.type === 'explorer')!, node.id);
+                } else {
+                  openFile(node);
+                }
+              }}
+              onContextMenu={(e) => handleFileContext(e, node)}
               className="flex flex-col items-center w-20 p-2 rounded hover:bg-white/10 transition-colors"
             >
-              <span className="text-3xl">
-                {node.type === 'folder' ? '📁' : node.extension === '.txt' ? '📄' : '📎'}
-              </span>
+              <span className="text-3xl">{getIconForNode(node)}</span>
               <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                 {node.name}
               </span>
             </button>
           ))}
+          {/* Trash */}
+          <button
+            onDoubleClick={() => openApp(APPS.find(a => a.type === 'explorer')!, 'trash')}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setCtxMenu({
+                x: e.clientX, y: e.clientY,
+                items: [
+                  { label: '열기', onClick: () => openApp(APPS.find(a => a.type === 'explorer')!, 'trash') },
+                  { label: '휴지통 비우기', onClick: () => { emptyTrash(); refreshDesktop(); }, divider: true, danger: true },
+                ],
+              });
+            }}
+            className="flex flex-col items-center w-20 p-2 rounded hover:bg-white/10 transition-colors"
+          >
+            <span className="text-3xl">🗑️</span>
+            <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              휴지통
+            </span>
+          </button>
         </div>
 
         {/* Windows */}
@@ -470,10 +516,10 @@ export default function Home() {
                   <BrowserContent win={win} onNavigate={navigateBrowser} active={isTop} />
                 )}
                 {win.app.type === 'notepad' && (
-                  <Notepad fileId={win.fileId} />
+                  <Notepad fileId={win.fileId} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'explorer' && (
-                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openFile} />
+                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openFile} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'iframe' && win.app.url && (
                   <iframe
@@ -564,6 +610,11 @@ export default function Home() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Context Menu */}
+      {ctxMenu && (
+        <ContextMenu x={ctxMenu.x} y={ctxMenu.y} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />
       )}
     </div>
   );

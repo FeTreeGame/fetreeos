@@ -1,18 +1,23 @@
+import { APPS } from './apps';
+
 const STORAGE_KEY = 'fetree-fs';
+const FS_VERSION_KEY = 'fetree-fs-version';
+const CURRENT_VERSION = 2;
 
 export interface FSNode {
   id: string;
   name: string;
-  type: 'file' | 'folder';
+  type: 'file' | 'folder' | 'app';
   parentId: string;
   extension?: string;
   content?: string;
   url?: string;
+  appId?: string;
+  icon?: string;
   createdAt: number;
   updatedAt: number;
 }
 
-// 확장자 → 앱 타입 매핑
 const EXT_APP_MAP: Record<string, string> = {
   '.txt': 'notepad',
   '.url': 'browser',
@@ -20,6 +25,14 @@ const EXT_APP_MAP: Record<string, string> = {
 
 export function getAppForExtension(ext?: string): string | null {
   return ext ? EXT_APP_MAP[ext] ?? null : null;
+}
+
+export function getIconForNode(node: FSNode): string {
+  if (node.icon) return node.icon;
+  if (node.type === 'app') return '📦';
+  if (node.type === 'folder') return '📁';
+  if (node.extension === '.txt') return '📄';
+  return '📎';
 }
 
 // --- localStorage 구현 (추후 Supabase로 교체) ---
@@ -99,8 +112,30 @@ export function updateNode(id: string, updates: Partial<Pick<FSNode, 'name' | 'c
   saveFS(nodes);
 }
 
+export function moveToTrash(id: string): void {
+  const nodes = loadFS();
+  const node = nodes.find(n => n.id === id);
+  if (node?.type === 'app') return;
+  const moveRecursive = (targetId: string) => {
+    const idx = nodes.findIndex(n => n.id === targetId);
+    if (idx >= 0 && nodes[idx].parentId !== 'trash') {
+      nodes[idx].parentId = 'trash';
+      nodes[idx].updatedAt = Date.now();
+    }
+    nodes.filter(n => n.parentId === targetId).forEach(n => moveRecursive(n.id));
+  };
+  moveRecursive(id);
+  saveFS(nodes);
+}
+
+export function restoreFromTrash(id: string, targetParent = 'desktop'): void {
+  updateNode(id, { parentId: targetParent });
+}
+
 export function deleteNode(id: string): void {
   let nodes = loadFS();
+  const target = nodes.find(n => n.id === id);
+  if (target?.type === 'app') return;
   const toDelete = new Set<string>();
   const collect = (targetId: string) => {
     toDelete.add(targetId);
@@ -111,9 +146,74 @@ export function deleteNode(id: string): void {
   saveFS(nodes);
 }
 
+export function emptyTrash(): void {
+  let nodes = loadFS();
+  const trashIds = new Set<string>();
+  const collect = (parentId: string) => {
+    nodes.filter(n => n.parentId === parentId).forEach(n => {
+      trashIds.add(n.id);
+      collect(n.id);
+    });
+  };
+  nodes.filter(n => n.parentId === 'trash').forEach(n => {
+    trashIds.add(n.id);
+    collect(n.id);
+  });
+  nodes = nodes.filter(n => !trashIds.has(n.id));
+  saveFS(nodes);
+}
+
+export function getTrashCount(): number {
+  return loadFS().filter(n => n.parentId === 'trash').length;
+}
+
 export function initDefaultFS(): void {
+  const version = typeof window !== 'undefined' ? Number(localStorage.getItem(FS_VERSION_KEY) || '0') : 0;
+  if (version >= CURRENT_VERSION) return;
+
   const nodes = loadFS();
-  if (nodes.length > 0) return;
-  createFile('desktop', '환영합니다.txt', '이곳은 FeTree OS입니다.\n자유롭게 파일을 만들고 정리해보세요.');
-  createFolder('desktop', '내 문서');
+  const existingAppIds = new Set(nodes.filter(n => n.type === 'app').map(n => n.appId));
+
+  for (const app of APPS) {
+    if (existingAppIds.has(app.id)) continue;
+    const node: FSNode = {
+      id: `app-${app.id}`,
+      name: app.title,
+      type: 'app',
+      parentId: 'desktop',
+      appId: app.id,
+      icon: app.icon,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    nodes.push(node);
+  }
+
+  if (!nodes.some(n => n.type === 'file' && n.name === '환영합니다.txt')) {
+    const ext = '.txt';
+    nodes.push({
+      id: `file-welcome-${Date.now()}`,
+      name: '환영합니다.txt',
+      type: 'file',
+      parentId: 'desktop',
+      extension: ext,
+      content: '이곳은 FeTree OS입니다.\n자유롭게 파일을 만들고 정리해보세요.',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  }
+
+  if (!nodes.some(n => n.type === 'folder' && n.name === '내 문서')) {
+    nodes.push({
+      id: `folder-docs-${Date.now()}`,
+      name: '내 문서',
+      type: 'folder',
+      parentId: 'desktop',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  }
+
+  saveFS(nodes);
+  if (typeof window !== 'undefined') localStorage.setItem(FS_VERSION_KEY, String(CURRENT_VERSION));
 }

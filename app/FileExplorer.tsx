@@ -6,11 +6,12 @@ import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, emp
 interface FileExplorerProps {
   mode?: 'desktop' | 'explorer';
   initialFolderId?: string;
+  refreshKey?: number;
   onOpenFile?: (node: FSNode) => void;
   onFSChange?: () => void;
 }
 
-export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', onOpenFile, onFSChange }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange }: FileExplorerProps) {
   const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
@@ -26,6 +27,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [currentFolder, onFSChange]);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { if (refreshKey !== undefined) setItems(getChildren(currentFolder)); }, [refreshKey, currentFolder]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);

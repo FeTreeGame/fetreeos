@@ -11,9 +11,9 @@
 ┌─────────────────────────────────┐
 │  Root Layout (layout.tsx)       │  HTML/body, 폰트, globals.css
 ├─────────────────────────────────┤
-│  Home (page.tsx)                │  전체 OS 쉘
+│  Home (page.tsx)                │  전체 OS 쉘 (윈도우 매니저)
 │  ├─ Desktop                     │  flex-1, 바탕화면 영역
-│  │  ├─ Desktop Icons            │  inset-0 flex-wrap, 퍼센트 패딩
+│  │  ├─ FileExplorer(desktop)    │  inset-0, mode='desktop' — 아이콘+휴지통
 │  │  ├─ Snap Preview             │  드래그 중 스냅 힌트 (% 기반)
 │  │  └─ Windows[]                │  자유 배치(비율) 또는 스냅(% CSS)
 │  ├─ Taskbar                     │  h-10 고정, Start + 창 버튼 + 시계
@@ -45,7 +45,7 @@ interface FSNode {
 }
 ```
 
-- **바탕화면 = `getChildren('desktop')`** — 앱/파일/폴더 통합 렌더링
+- **바탕화면 = FileExplorer desktop 모드** — `getChildren('desktop')` + 휴지통 가상 노드
 - **앱 바로가기**: `type: 'app'` 노드, `initDefaultFS`에서 APPS 기반 자동 생성, 삭제 보호
 - **휴지통**: `parentId: 'trash'`로 이동, 완전 삭제는 `emptyTrash`만
 - **확장자→앱 매핑**: `.txt` → notepad, `.url` → browser
@@ -75,12 +75,15 @@ interface AppDef {
 
 ## 컴포넌트 구조
 
+- `FileExplorer.tsx` — **바탕화면 + 파일 탐색기 통합** (Windows explorer.exe 구조)
+  - `mode='desktop'`: 툴바/상태바 숨김, 배경 투명, 큰 아이콘, 휴지통 가상 노드 포함
+  - `mode='explorer'`: 툴바(뒤로/앞으로/위로/주소), 상태바, 폴더 내부 탐색
+  - `refreshKey` prop으로 외부 FS 변경 감지 (Notepad 등에서 파일 생성 시 바탕화면 갱신)
 - `Clock.tsx` — 시계 + 캘린더 팝업
-- `Notepad.tsx` — 파일 기반 텍스트 편집기
-- `FileExplorer.tsx` — 파일 탐색기
+- `Notepad.tsx` — ���일 기반 텍스트 편집기
 - `ContextMenu.tsx` — 범용 우클릭 메뉴 (화면 경계 바운딩)
 
-앱 내 변경이 바탕화면에 반영되도록 `onFSChange` 콜백 패턴 사용.
+`page.tsx`는 윈도우 매니저(드래그/리사이즈/스냅/태스크바)에 집중, 파일 관련 로직은 FileExplorer로 위임.
 
 ## 윈도우 관리
 

@@ -30,6 +30,7 @@
 - [x] 휴지통 시스템 (moveToTrash/emptyTrash, 앱 노드 삭제 보호)
 - [x] FS 버전 관리 (앱 추가 시 기존 사용자 데이터 보존)
 - [x] 100dvh 모바일 뷰포트 대응
+- [x] 바탕화면·탐색기 통합 (FileExplorer mode='desktop'|'explorer' — explorer.exe 구조)
 
 ## 앱 로드맵
 

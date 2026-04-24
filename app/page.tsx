@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { APPS, type AppDef } from './apps';
+import Clock from './Clock';
+import Notepad from './Notepad';
 
 const GAMES_DATA: Record<string, { title: string; embedUrl: string }> = {
   'dog-ninja': { title: 'Dog Ninja', embedUrl: 'https://www.youtube.com/embed/iofYDsA2yqg' },
@@ -129,26 +131,6 @@ function BrowserContent({ win, onNavigate, active }: { win: WindowState; onNavig
   );
 }
 
-function NotepadContent({ text }: { text: string }) {
-  const [content, setContent] = useState(text);
-  return (
-    <div className="flex flex-col h-full">
-      {/* Menu bar */}
-      <div className="flex items-center gap-3 px-3 py-1 bg-zinc-800 border-b border-zinc-700 text-xs text-zinc-400">
-        <span className="hover:text-white cursor-default">File</span>
-        <span className="hover:text-white cursor-default">Edit</span>
-        <span className="hover:text-white cursor-default">Format</span>
-        <span className="hover:text-white cursor-default">Help</span>
-      </div>
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        className="flex-1 bg-zinc-950 text-zinc-300 text-xs p-3 outline-none resize-none font-mono leading-relaxed"
-        spellCheck={false}
-      />
-    </div>
-  );
-}
 
 type DragMode =
   | { kind: 'move'; id: string; offsetX: number; offsetY: number }
@@ -305,13 +287,6 @@ export default function Home() {
     setSnapPreview(null);
   }, [drag, snapPreview]);
 
-  const [timeStr, setTimeStr] = useState('');
-  useEffect(() => {
-    const update = () => setTimeStr(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }));
-    update();
-    const id = setInterval(update, 30000);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <div
@@ -446,7 +421,7 @@ export default function Home() {
                   <BrowserContent win={win} onNavigate={navigateBrowser} active={isTop} />
                 )}
                 {win.app.type === 'notepad' && (
-                  <NotepadContent text={win.app.text || ''} />
+                  <Notepad />
                 )}
                 {win.app.type === 'iframe' && win.app.url && (
                   <iframe
@@ -511,7 +486,7 @@ export default function Home() {
             );
           })}
         </div>
-        <div className="text-xs text-white/50 px-2">{timeStr}</div>
+        <Clock />
       </div>
 
       {/* Start Menu */}

@@ -77,6 +77,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
   const [iconPositions, setIconPositions] = useState<IconPositions>({});
 
+  const [iconDrag, setIconDrag] = useState<{
+    id: string;
+    startX: number;
+    startY: number;
+    curX: number;
+    curY: number;
+    active: boolean;
+  } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ col: number; row: number } | null>(null);
+
   const refresh = useCallback(() => {
     setItems(getChildren(currentFolder));
     onFSChange?.();
@@ -174,6 +184,48 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setRenaming(null);
   }, [renaming, renameValue, refresh]);
 
+  const handleIconPointerDown = useCallback((id: string, e: React.PointerEvent) => {
+    if (!isDesktop) return;
+    setIconDrag({ id, startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY, active: false });
+  }, [isDesktop]);
+
+  const handleDesktopPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!iconDrag) return;
+    const dx = e.clientX - iconDrag.startX;
+    const dy = e.clientY - iconDrag.startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (!iconDrag.active && dist < 5) return;
+
+    const el = contentRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const col = Math.max(0, Math.min(gridSize.cols - 1, Math.floor((e.clientX - rect.left) / CELL_W)));
+    const row = Math.max(0, Math.min(gridSize.rows - 1, Math.floor((e.clientY - rect.top) / CELL_H)));
+
+    setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
+    setDropTarget({ col, row });
+  }, [iconDrag, gridSize]);
+
+  const handleDesktopPointerUp = useCallback(() => {
+    if (iconDrag?.active && dropTarget) {
+      setIconPositions(prev => {
+        const next = { ...prev };
+        const targetKey = Object.keys(next).find(
+          k => next[k].col === dropTarget.col && next[k].row === dropTarget.row
+        );
+        if (targetKey && targetKey !== iconDrag.id) {
+          next[targetKey] = { ...prev[iconDrag.id] };
+        }
+        next[iconDrag.id] = { col: dropTarget.col, row: dropTarget.row };
+        saveIconPositions(next);
+        return next;
+      });
+    }
+    setIconDrag(null);
+    setDropTarget(null);
+  }, [iconDrag, dropTarget]);
+
   const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : items.length >= 0 ? currentFolder : currentFolder;
 
   return (
@@ -206,6 +258,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         ref={contentRef}
         className={`flex-1 overflow-auto ${isDesktop ? '' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
+        onPointerMove={isDesktop ? handleDesktopPointerMove : undefined}
+        onPointerUp={isDesktop ? handleDesktopPointerUp : undefined}
       >
         {items.length === 0 && !isDesktop ? (
           <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
@@ -229,9 +283,24 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 />
               );
             })}
+            {/* Drop target highlight */}
+            {iconDrag?.active && dropTarget && (
+              <div
+                className="absolute rounded pointer-events-none"
+                style={{
+                  left: dropTarget.col * CELL_W,
+                  top: dropTarget.row * CELL_H,
+                  width: CELL_W,
+                  height: CELL_H,
+                  background: 'rgba(100, 140, 255, 0.15)',
+                  border: '2px solid rgba(100, 140, 255, 0.4)',
+                }}
+              />
+            )}
             {items.map(node => {
               const pos = iconPositions[node.id];
               if (!pos) return null;
+              const isDragging = iconDrag?.active && iconDrag.id === node.id;
               return (
                 <button
                   key={node.id}
@@ -242,8 +311,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     width: CELL_W,
                     height: CELL_H,
                     padding: 6,
+                    opacity: isDragging ? 0.3 : 1,
                   }}
-                  onDoubleClick={() => handleDoubleClick(node)}
+                  onPointerDown={(e) => handleIconPointerDown(node.id, e)}
+                  onDoubleClick={() => { if (!iconDrag?.active) handleDoubleClick(node); }}
                   onContextMenu={(e) => handleContextMenu(e, node)}
                 >
                   <span className="text-3xl">{getIconForNode(node)}</span>
@@ -268,6 +339,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             {(() => {
               const pos = iconPositions['__trash__'];
               if (!pos) return null;
+              const isDragging = iconDrag?.active && iconDrag.id === '__trash__';
               return (
                 <button
                   className="absolute flex flex-col items-center justify-center rounded hover:bg-white/10 transition-colors"
@@ -277,8 +349,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     width: CELL_W,
                     height: CELL_H,
                     padding: 6,
+                    opacity: isDragging ? 0.3 : 1,
                   }}
-                  onDoubleClick={() => {
+                  onPointerDown={(e) => handleIconPointerDown('__trash__', e)}
+                  onDoubleClick={() => { if (iconDrag?.active) return;
                     const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
                     onOpenFile?.(trashNode);
                   }}
@@ -293,6 +367,32 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     휴지통
                   </span>
                 </button>
+              );
+            })()}
+            {/* Ghost icon during drag */}
+            {iconDrag?.active && (() => {
+              const dragNode = items.find(n => n.id === iconDrag.id);
+              const icon = dragNode ? getIconForNode(dragNode) : iconDrag.id === '__trash__' ? '🗑️' : '📎';
+              const label = dragNode?.name ?? (iconDrag.id === '__trash__' ? '휴지통' : '');
+              const rect = contentRef.current?.getBoundingClientRect();
+              if (!rect) return null;
+              return (
+                <div
+                  className="fixed flex flex-col items-center justify-center pointer-events-none"
+                  style={{
+                    left: iconDrag.curX - CELL_W / 2,
+                    top: iconDrag.curY - CELL_H / 2,
+                    width: CELL_W,
+                    height: CELL_H,
+                    opacity: 0.7,
+                    zIndex: 10001,
+                  }}
+                >
+                  <span className="text-3xl">{icon}</span>
+                  <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    {label}
+                  </span>
+                </div>
               );
             })()}
           </div>

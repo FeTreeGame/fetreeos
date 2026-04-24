@@ -4,6 +4,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { APPS, type AppDef } from './apps';
 import Clock from './Clock';
 import Notepad from './Notepad';
+import FileExplorer from './FileExplorer';
+import { getChildren, initDefaultFS, getAppForExtension, type FSNode } from './fileSystem';
 
 const GAMES_DATA: Record<string, { title: string; embedUrl: string }> = {
   'dog-ninja': { title: 'Dog Ninja', embedUrl: 'https://www.youtube.com/embed/iofYDsA2yqg' },
@@ -28,6 +30,7 @@ interface WindowState {
   preSnapH?: number;
   zIndex: number;
   browserUrl?: string;
+  fileId?: string;
 }
 
 const MIN_W_PX = 320;
@@ -148,16 +151,24 @@ export default function Home() {
     return ++zCounter;
   }, []);
 
-  const openApp = useCallback((app: AppDef) => {
+  const openApp = useCallback((app: AppDef, fileId?: string) => {
     setStartMenuOpen(false);
     const desktop = desktopRef.current;
     const dw = desktop?.clientWidth ?? 800;
     const dh = desktop?.clientHeight ?? 600;
     setWindows(prev => {
-      const existing = prev.find(w => w.app.id === app.id);
-      if (existing) {
-        setFocusedId(existing.id);
-        return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
+      if (!fileId) {
+        const existing = prev.find(w => w.app.id === app.id && !w.fileId);
+        if (existing) {
+          setFocusedId(existing.id);
+          return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
+        }
+      } else {
+        const existing = prev.find(w => w.fileId === fileId);
+        if (existing) {
+          setFocusedId(existing.id);
+          return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
+        }
       }
       const newId = `${app.id}-${Date.now()}`;
       const baseW = app.defaultW ?? 640;
@@ -179,9 +190,30 @@ export default function Home() {
         snapZone: null,
         zIndex: topZIndex(),
         browserUrl: '',
+        fileId,
       }];
     });
   }, [topZIndex]);
+
+  const openFile = useCallback((node: FSNode) => {
+    const appType = getAppForExtension(node.extension);
+    if (appType) {
+      const app = APPS.find(a => a.type === appType);
+      if (app) { openApp(app, node.id); return; }
+    }
+    const notepad = APPS.find(a => a.type === 'notepad');
+    if (notepad) openApp(notepad, node.id);
+  }, [openApp]);
+
+  const [desktopFiles, setDesktopFiles] = useState<FSNode[]>([]);
+  const refreshDesktop = useCallback(() => {
+    setDesktopFiles(getChildren('desktop'));
+  }, []);
+
+  useEffect(() => {
+    initDefaultFS();
+    refreshDesktop();
+  }, [refreshDesktop]);
 
   const closeWindow = useCallback((id: string) => {
     setWindows(prev => prev.filter(w => w.id !== id));
@@ -328,6 +360,23 @@ export default function Home() {
               </span>
             </button>
           ))}
+          {desktopFiles.map(node => (
+            <button
+              key={node.id}
+              onDoubleClick={() => node.type === 'folder'
+                ? openApp(APPS.find(a => a.type === 'explorer')!, node.id)
+                : openFile(node)
+              }
+              className="flex flex-col items-center w-20 p-2 rounded hover:bg-white/10 transition-colors"
+            >
+              <span className="text-3xl">
+                {node.type === 'folder' ? '📁' : node.extension === '.txt' ? '📄' : '📎'}
+              </span>
+              <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                {node.name}
+              </span>
+            </button>
+          ))}
         </div>
 
         {/* Windows */}
@@ -421,7 +470,10 @@ export default function Home() {
                   <BrowserContent win={win} onNavigate={navigateBrowser} active={isTop} />
                 )}
                 {win.app.type === 'notepad' && (
-                  <Notepad />
+                  <Notepad fileId={win.fileId} />
+                )}
+                {win.app.type === 'explorer' && (
+                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openFile} />
                 )}
                 {win.app.type === 'iframe' && win.app.url && (
                   <iframe

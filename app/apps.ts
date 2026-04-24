@@ -2,7 +2,7 @@ export interface AppDef {
   id: string;
   title: string;
   icon: string;
-  type: 'browser' | 'notepad' | 'iframe' | 'empty';
+  type: 'browser' | 'notepad' | 'iframe' | 'explorer' | 'empty';
   defaultW?: number;
   defaultH?: number;
   url?: string;
@@ -11,6 +11,7 @@ export interface AppDef {
 
 export const APPS: AppDef[] = [
   // --- 기본 앱 ---
+  { id: 'explorer', title: 'Files', icon: '📂', type: 'explorer' },
   { id: 'browser', title: 'Internet', icon: '🌐', type: 'browser' },
   { id: 'notepad', title: 'Notes', icon: '📝', type: 'notepad' },
   { id: 'settings', title: 'Settings', icon: '⚙', type: 'empty' },

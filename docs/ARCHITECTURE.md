@@ -30,19 +30,24 @@
 
 ## 앱 시스템
 
+앱 정의는 `app/apps.ts`에 분리. 기본 앱(browser, notepad, settings)과 콘텐츠 앱(iframe 외부 프로젝트)을 구분.
+
 ```typescript
 interface AppDef {
   id: string;
   title: string;
   icon: string;
-  type: 'browser' | 'notepad' | 'empty';
+  type: 'browser' | 'notepad' | 'iframe' | 'empty';
   defaultW?: number;   // px 기본 크기 (열릴 때 비율로 변환)
   defaultH?: number;
+  url?: string;        // iframe 앱의 임베드 URL
+  text?: string;       // notepad 앱의 초기 텍스트
 }
 ```
 
 - `browser`: 주소창 + 게임 목록/상세 + iframe 임베드
 - `notepad`: 메뉴바 + 편집 가능 textarea
+- `iframe`: 외부 배포 프로젝트를 전체 크기 iframe으로 임베드 (비활성 시 pointerEvents 차단)
 - `empty`: 플레이스홀더 (미구현 앱)
 
 ## 윈도우 관리

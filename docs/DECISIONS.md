@@ -41,3 +41,14 @@ Elara가 순수 JS + 프레임워크 무관 + 도킹 내장으로 가장 적합.
 **이유**: 별도 컨테이너를 만들 필요 없이 기존 구조를 격상.
 `overflow-hidden`으로 태스크바 침범 방지, 아이콘은 `inset-0 flex-wrap`으로 바운딩.
 원칙: "고정 위치 요소는 %, 사용자 배치 요소는 비율 + clamp".
+
+## 앱 정의 분리 + iframe 타입 (2026-04-24)
+
+**결정**: AppDef와 APPS 배열을 `app/apps.ts`로 분리. `iframe` 타입을 추가하여 배포된 외부 프로젝트를 임베드.
+
+**이유**: 콘텐츠 앱(Experience Space, Interactive Plains 등)은 OS 기본 요소가 아니라 콘텐츠.
+기본 앱과 콘텐츠 앱의 관심사를 분리하고, 앱 추가 시 apps.ts만 수정하면 되도록 구조화.
+iframe은 배포된 앱을 별도 프로세스처럼 격리 실행하는 가장 단순한 방법.
+
+**트레이드오프**: iframe 대상 앱이 X-Frame-Options로 임베딩을 거부할 수 있음.
+본인 프로젝트는 해당 헤더를 제거하여 해결. 추후 인증 도입 시 CSP frame-ancestors로 제한 예정.

@@ -16,9 +16,12 @@
 - [x] 아이콘 바운딩 (flex-wrap, overflow-hidden)
 - [x] 앱 기본 크기 통일 + 커스텀 필드
 
+- [x] 앱 정의 분리 (apps.ts) + iframe 타입 추가
+- [x] 콘텐츠 앱 연동 (Experience Space, Interactive Plains — iframe 임베드)
+
 ## 미착수
 
-- [ ] 기존 프로젝트 앱 연동 (craft_3d, experience-space 등)
+- [ ] 기존 프로젝트 추가 연동 (craft_3d 등)
 - [ ] 우클릭 컨텍스트 메뉴
 - [ ] 시계 실시간 갱신 개선 (현재 30초 간격)
 - [ ] games/[slug] 라우트 정리 (orphaned)

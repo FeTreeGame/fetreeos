@@ -315,7 +315,7 @@ export default function Home() {
 
   return (
     <div
-      className="h-screen w-screen flex flex-col overflow-hidden select-none"
+      className="w-screen flex flex-col overflow-hidden select-none" style={{ height: '100dvh' }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >

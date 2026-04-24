@@ -7,6 +7,8 @@ interface AppDef {
   title: string;
   icon: string;
   type: 'browser' | 'notepad' | 'empty';
+  defaultW?: number;
+  defaultH?: number;
   url?: string;
   text?: string;
 }
@@ -84,9 +86,8 @@ interface WindowState {
   browserUrl?: string;
 }
 
-const MIN_W = 320;
-const MIN_H = 200;
-const TASKBAR_H = 40;
+const MIN_W_PX = 320;
+const MIN_H_PX = 200;
 const SNAP_EDGE_PX = 16;
 
 type SnapZone = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'fullscreen' | null;
@@ -224,18 +225,27 @@ export default function Home() {
 
   const openApp = useCallback((app: AppDef) => {
     setStartMenuOpen(false);
+    const desktop = desktopRef.current;
+    const dw = desktop?.clientWidth ?? 800;
+    const dh = desktop?.clientHeight ?? 600;
     setWindows(prev => {
       const existing = prev.find(w => w.app.id === app.id);
       if (existing) {
         return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
       }
+      const baseW = app.defaultW ?? 640;
+      const baseH = app.defaultH ?? 420;
+      const w = Math.min(baseW, dw - 40) / dw;
+      const h = Math.min(baseH, dh - 40) / dh;
+      const x = Math.min(80 + prev.length * 30, dw - baseW - 20) / dw;
+      const y = Math.min(60 + prev.length * 30, dh - baseH - 20) / dh;
       return [...prev, {
         id: `${app.id}-${Date.now()}`,
         app,
-        x: 80 + prev.length * 30,
-        y: 60 + prev.length * 30,
-        w: app.type === 'notepad' ? 520 : 640,
-        h: app.type === 'notepad' ? 480 : 420,
+        x: Math.max(0, x),
+        y: Math.max(0, y),
+        w,
+        h,
         minimized: false,
         maximized: false,
         snapZone: null,
@@ -295,27 +305,29 @@ export default function Home() {
     const dr = desktop.getBoundingClientRect();
 
     if (drag.kind === 'move') {
-      let x = e.clientX - dr.left - drag.offsetX;
-      let y = e.clientY - dr.top - drag.offsetY;
-      x = Math.max(-200, Math.min(x, dr.width - 80));
-      y = Math.max(0, Math.min(y, dr.height - 40));
+      let x = (e.clientX - dr.left - drag.offsetX) / dr.width;
+      let y = (e.clientY - dr.top - drag.offsetY) / dr.height;
+      x = Math.max(-0.2, Math.min(x, 1 - 80 / dr.width));
+      y = Math.max(0, Math.min(y, 1 - 40 / dr.height));
       setWindows(prev => prev.map(w => w.id === drag.id ? { ...w, x, y, maximized: false, snapZone: null } : w));
       setSnapPreview(detectSnap(e.clientX, e.clientY, dr));
     } else {
-      const dx = e.clientX - drag.startX;
-      const dy = e.clientY - drag.startY;
+      const dx = (e.clientX - drag.startX) / dr.width;
+      const dy = (e.clientY - drag.startY) / dr.height;
+      const minW = MIN_W_PX / dr.width;
+      const minH = MIN_H_PX / dr.height;
       setWindows(prev => prev.map(w => {
         if (w.id !== drag.id) return w;
         const next = { ...w };
-        if (drag.edge.includes('e')) next.w = Math.max(MIN_W, drag.startW + dx);
-        if (drag.edge.includes('s')) next.h = Math.max(MIN_H, drag.startH + dy);
+        if (drag.edge.includes('e')) next.w = Math.max(minW, drag.startW + dx);
+        if (drag.edge.includes('s')) next.h = Math.max(minH, drag.startH + dy);
         if (drag.edge.includes('w')) {
-          const newW = Math.max(MIN_W, drag.startW - dx);
+          const newW = Math.max(minW, drag.startW - dx);
           next.x = drag.startWX + (drag.startW - newW);
           next.w = newW;
         }
         if (drag.edge.includes('n')) {
-          const newH = Math.max(MIN_H, drag.startH - dy);
+          const newH = Math.max(minH, drag.startH - dy);
           next.y = drag.startWY + (drag.startH - newH);
           next.h = newH;
         }
@@ -353,7 +365,7 @@ export default function Home() {
       {/* Desktop */}
       <div
         ref={desktopRef}
-        className="flex-1 relative"
+        className="flex-1 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #1a3a4a 0%, #0d1f2d 50%, #1a2a3a 100%)' }}
         onClick={() => setStartMenuOpen(false)}
       >
@@ -371,7 +383,7 @@ export default function Home() {
         )}
 
         {/* Desktop Icons */}
-        <div className="absolute flex flex-col gap-2" style={{ top: '2%', left: '1.5%' }}>
+        <div className="absolute inset-0 p-4 flex flex-col flex-wrap gap-2 content-start">
           {APPS.map(app => (
             <button
               key={app.id}
@@ -408,14 +420,16 @@ export default function Home() {
                 borderRadius: isMax ? 0 : 4,
                 overflow: 'hidden',
               } : {
-                left: win.x,
-                top: win.y,
-                width: win.w,
-                height: win.h,
+                left: `${win.x * 100}%`,
+                top: `${win.y * 100}%`,
+                width: `${win.w * 100}%`,
+                height: `${win.h * 100}%`,
                 zIndex: win.zIndex,
                 border: '1px solid rgba(255,255,255,0.15)',
                 borderRadius: 8,
                 overflow: 'hidden',
+                minWidth: MIN_W_PX,
+                minHeight: MIN_H_PX,
               }}
               onPointerDown={() => focusWindow(win.id)}
             >
@@ -428,7 +442,11 @@ export default function Home() {
                     : 'linear-gradient(180deg, #2e2e3a 0%, #22222e 100%)',
                   cursor: isMax ? 'default' : 'move',
                 }}
-                onPointerDown={(e) => { if (!isMax) { if (isSnapped) { setWindows(prev => prev.map(w => w.id === win.id ? { ...w, snapZone: null } : w)); } handleTitlePointerDown(win.id, e); } }}
+                onPointerDown={(e) => {
+                  if (isMax) return;
+                  if ((e.target as HTMLElement).closest('button')) return;
+                  handleTitlePointerDown(win.id, e);
+                }}
                 onDoubleClick={() => toggleMaximize(win.id)}
               >
                 <span className="text-sm">{win.app.icon}</span>

@@ -197,10 +197,14 @@ export default function Home() {
     });
   }, [topZIndex]);
 
-  const openFile = useCallback((node: FSNode) => {
+  const openNode = useCallback((node: FSNode) => {
     if (node.type === 'app' && node.appId) {
       const app = APPS.find(a => a.id === node.appId);
       if (app) { openApp(app); return; }
+    }
+    if (node.type === 'folder') {
+      const explorer = APPS.find(a => a.type === 'explorer');
+      if (explorer) { openApp(explorer, node.id); return; }
     }
     const appType = getAppForExtension(node.extension);
     if (appType) {
@@ -244,11 +248,11 @@ export default function Home() {
       items.push({ label: '열기', onClick: () => openApp(APPS.find(a => a.type === 'explorer')!, node.id) });
       items.push({ label: '휴지통으로 이동', onClick: () => { moveToTrash(node.id); refreshDesktop(); }, divider: true, danger: true });
     } else {
-      items.push({ label: '열기', onClick: () => openFile(node) });
+      items.push({ label: '열기', onClick: () => openNode(node) });
       items.push({ label: '휴지통으로 이동', onClick: () => { moveToTrash(node.id); refreshDesktop(); }, divider: true, danger: true });
     }
     setCtxMenu({ x: e.clientX, y: e.clientY, items });
-  }, [openApp, openFile, refreshDesktop]);
+  }, [openApp, openNode, refreshDesktop]);
 
   const closeWindow = useCallback((id: string) => {
     setWindows(prev => prev.filter(w => w.id !== id));
@@ -394,7 +398,7 @@ export default function Home() {
                 } else if (node.type === 'folder') {
                   openApp(APPS.find(a => a.type === 'explorer')!, node.id);
                 } else {
-                  openFile(node);
+                  openNode(node);
                 }
               }}
               onContextMenu={(e) => handleFileContext(e, node)}
@@ -523,7 +527,7 @@ export default function Home() {
                   <Notepad fileId={win.fileId} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'explorer' && (
-                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openFile} onFSChange={refreshDesktop} />
+                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openNode} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'iframe' && win.app.url && (
                   <iframe

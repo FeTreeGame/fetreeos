@@ -402,6 +402,7 @@ export default function Home() {
                 }}
                 onPointerDown={(e) => {
                   if ((e.target as HTMLElement).closest('button')) return;
+                  focusWindow(win.id);
                   if (isSnapped || isMax) {
                     const desktop = desktopRef.current;
                     if (!desktop) return;
@@ -409,13 +410,16 @@ export default function Home() {
                     const restoreW = win.preSnapW ?? 0.4;
                     const restoreH = win.preSnapH ?? 0.35;
                     const cx = (e.clientX - dr.left) / dr.width;
-                    const newX = cx - restoreW / 2;
+                    const newX = Math.max(0, Math.min(cx - restoreW / 2, 1 - restoreW));
+                    const offsetX = (cx - newX) * dr.width;
+                    const offsetY = e.clientY - dr.top;
                     setWindows(prev => prev.map(w => w.id === win.id ? {
                       ...w, snapZone: null, maximized: false,
-                      x: Math.max(0, Math.min(newX, 1 - restoreW)),
-                      y: 0,
+                      x: newX, y: 0,
                       w: restoreW, h: restoreH,
                     } : w));
+                    setDrag({ kind: 'move', id: win.id, offsetX, offsetY });
+                    return;
                   }
                   handleTitlePointerDown(win.id, e);
                 }}

@@ -47,7 +47,8 @@ interface AppDef {
 
 ## 윈도우 관리
 
-- **z-index**: 전역 카운터(`zCounter++`)로 포커스 순서 관리
+- **z-index**: 전역 카운터(`zCounter++`)로 스택 순서 관리
+- **포커스**: `focusedId` 상태로 활성 창 추적. 바탕화면 클릭 시 null → 모든 타이틀바 비활성
 - **드래그**: 타이틀바 pointerdown → pointermove(비율 연산) → pointerup
 - **리사이즈**: 8방향 엣지/코너 핸들, 비율 연산, 최소 크기 clamp
 - **스냅**: Elara 패턴 — 커서 위치를 % 변환 → SNAP_ZONES 매칭 → 프리뷰 → 확정

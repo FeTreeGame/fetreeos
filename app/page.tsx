@@ -123,7 +123,7 @@ function detectSnap(cursorX: number, cursorY: number, container: DOMRect): SnapZ
 
 let zCounter = 1;
 
-function BrowserContent({ win, onNavigate }: { win: WindowState; onNavigate: (id: string, url: string) => void }) {
+function BrowserContent({ win, onNavigate, active }: { win: WindowState; onNavigate: (id: string, url: string) => void; active: boolean }) {
   const [addressBar, setAddressBar] = useState(win.browserUrl || '');
   const currentSlug = win.browserUrl?.replace('/games/', '') || '';
   const game = GAMES_DATA[currentSlug];
@@ -161,7 +161,7 @@ function BrowserContent({ win, onNavigate }: { win: WindowState; onNavigate: (id
           <div className="p-4">
             <h1 className="text-lg font-bold mb-3">{game.title}</h1>
             <div className="aspect-video bg-black rounded overflow-hidden mb-3">
-              <iframe src={game.embedUrl} className="w-full h-full" allowFullScreen />
+              <iframe src={game.embedUrl} className="w-full h-full" allowFullScreen style={{ pointerEvents: active ? 'auto' : 'none' }} />
             </div>
             <button onClick={() => navigate('')} className="text-xs text-blue-400 hover:underline">← Back to list</button>
           </div>
@@ -216,6 +216,7 @@ export default function Home() {
   const [windows, setWindows] = useState<WindowState[]>([]);
   const [drag, setDrag] = useState<DragMode | null>(null);
   const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
 
@@ -231,16 +232,19 @@ export default function Home() {
     setWindows(prev => {
       const existing = prev.find(w => w.app.id === app.id);
       if (existing) {
+        setFocusedId(existing.id);
         return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
       }
+      const newId = `${app.id}-${Date.now()}`;
       const baseW = app.defaultW ?? 640;
       const baseH = app.defaultH ?? 420;
       const w = Math.min(baseW, dw - 40) / dw;
       const h = Math.min(baseH, dh - 40) / dh;
       const x = Math.min(80 + prev.length * 30, dw - baseW - 20) / dw;
       const y = Math.min(60 + prev.length * 30, dh - baseH - 20) / dh;
+      setFocusedId(newId);
       return [...prev, {
-        id: `${app.id}-${Date.now()}`,
+        id: newId,
         app,
         x: Math.max(0, x),
         y: Math.max(0, y),
@@ -257,6 +261,7 @@ export default function Home() {
 
   const closeWindow = useCallback((id: string) => {
     setWindows(prev => prev.filter(w => w.id !== id));
+    setFocusedId(prev => prev === id ? null : prev);
   }, []);
 
   const minimizeWindow = useCallback((id: string) => {
@@ -264,6 +269,7 @@ export default function Home() {
   }, []);
 
   const focusWindow = useCallback((id: string) => {
+    setFocusedId(id);
     setWindows(prev => prev.map(w => w.id === id ? { ...w, zIndex: topZIndex(), minimized: false } : w));
   }, [topZIndex]);
 
@@ -367,7 +373,7 @@ export default function Home() {
         ref={desktopRef}
         className="flex-1 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #1a3a4a 0%, #0d1f2d 50%, #1a2a3a 100%)' }}
-        onClick={() => setStartMenuOpen(false)}
+        onClick={() => { setStartMenuOpen(false); setFocusedId(null); }}
       >
         {/* Snap Preview */}
         {snapPreview && drag?.kind === 'move' && (
@@ -401,7 +407,7 @@ export default function Home() {
         {/* Windows */}
         {windows.map(win => {
           if (win.minimized) return null;
-          const isTop = win.zIndex === zCounter;
+          const isTop = win.id === focusedId;
           const isMax = win.maximized;
           const snap = win.snapZone ? SNAP_RECTS[win.snapZone] : null;
           const isSnapped = !!snap;
@@ -432,6 +438,7 @@ export default function Home() {
                 minHeight: MIN_H_PX,
               }}
               onPointerDown={() => focusWindow(win.id)}
+              onClick={(e) => e.stopPropagation()}
             >
               {/* Title Bar */}
               <div
@@ -465,9 +472,9 @@ export default function Home() {
                 >✕</button>
               </div>
               {/* Content */}
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden" onPointerDown={() => focusWindow(win.id)}>
                 {win.app.type === 'browser' && (
-                  <BrowserContent win={win} onNavigate={navigateBrowser} />
+                  <BrowserContent win={win} onNavigate={navigateBrowser} active={isTop} />
                 )}
                 {win.app.type === 'notepad' && (
                   <NotepadContent text={win.app.text || ''} />
@@ -510,7 +517,7 @@ export default function Home() {
         <div className="w-px h-5 bg-white/10 mx-1" />
         <div className="flex-1 flex gap-1 overflow-hidden">
           {windows.map(win => {
-            const isTop = win.zIndex === zCounter;
+            const isTop = win.id === focusedId;
             return (
               <button
                 key={win.id}

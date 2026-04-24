@@ -22,6 +22,8 @@ interface WindowState {
   minimized: boolean;
   maximized: boolean;
   snapZone: SnapZone;
+  preSnapW?: number;
+  preSnapH?: number;
   zIndex: number;
   browserUrl?: string;
 }
@@ -217,7 +219,14 @@ export default function Home() {
     setWindows(prev => prev.map(w => {
       if (w.id !== id) return w;
       const goingMax = !w.maximized;
-      return { ...w, maximized: goingMax, snapZone: goingMax ? 'fullscreen' : null, zIndex: topZIndex() };
+      return {
+        ...w,
+        maximized: goingMax,
+        snapZone: goingMax ? 'fullscreen' : null,
+        preSnapW: goingMax && !w.snapZone ? w.w : w.preSnapW,
+        preSnapH: goingMax && !w.snapZone ? w.h : w.preSnapH,
+        zIndex: topZIndex(),
+      };
     }));
   }, [topZIndex]);
 
@@ -288,6 +297,8 @@ export default function Home() {
         ...w,
         snapZone: snapPreview,
         maximized: snapPreview === 'fullscreen',
+        preSnapW: w.snapZone ? w.preSnapW : w.w,
+        preSnapH: w.snapZone ? w.preSnapH : w.h,
       } : w));
     }
     setDrag(null);
@@ -387,11 +398,25 @@ export default function Home() {
                   background: isTop
                     ? 'linear-gradient(180deg, #4a4a65 0%, #35354a 100%)'
                     : 'linear-gradient(180deg, #2e2e3a 0%, #22222e 100%)',
-                  cursor: isMax ? 'default' : 'move',
+                  cursor: 'move',
                 }}
                 onPointerDown={(e) => {
-                  if (isMax) return;
                   if ((e.target as HTMLElement).closest('button')) return;
+                  if (isSnapped || isMax) {
+                    const desktop = desktopRef.current;
+                    if (!desktop) return;
+                    const dr = desktop.getBoundingClientRect();
+                    const restoreW = win.preSnapW ?? 0.4;
+                    const restoreH = win.preSnapH ?? 0.35;
+                    const cx = (e.clientX - dr.left) / dr.width;
+                    const newX = cx - restoreW / 2;
+                    setWindows(prev => prev.map(w => w.id === win.id ? {
+                      ...w, snapZone: null, maximized: false,
+                      x: Math.max(0, Math.min(newX, 1 - restoreW)),
+                      y: 0,
+                      w: restoreW, h: restoreH,
+                    } : w));
+                  }
                   handleTitlePointerDown(win.id, e);
                 }}
                 onDoubleClick={() => toggleMaximize(win.id)}

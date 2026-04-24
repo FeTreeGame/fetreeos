@@ -19,6 +19,15 @@
 - [x] 앱 정의 분리 (apps.ts) + iframe 타입 추가
 - [x] 콘텐츠 앱 연동 (Experience Space, Interactive Plains — iframe 임베드)
 
+- [x] 스냅/최대화 창 타이틀바 드래그로 해제 + 이전 크기 복원
+
+## 앱 로드맵
+
+- [ ] 미니홈피 (개인 공간 — Supabase 인증 연동)
+- [ ] 플래시 게임 사이트 (browser 앱 확장)
+- [ ] 구름글귀평원 (YouTube iframe + CSS 오버레이 구름 자막)
+- [ ] Supabase + Google OAuth 통합 인증 (OS 쉘 → iframe 앱 세션 전파)
+
 ## 미착수
 
 - [ ] 기존 프로젝트 추가 연동 (craft_3d 등)

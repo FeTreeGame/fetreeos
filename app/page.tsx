@@ -198,6 +198,10 @@ export default function Home() {
   }, [topZIndex]);
 
   const openFile = useCallback((node: FSNode) => {
+    if (node.type === 'app' && node.appId) {
+      const app = APPS.find(a => a.id === node.appId);
+      if (app) { openApp(app); return; }
+    }
     const appType = getAppForExtension(node.extension);
     if (appType) {
       const app = APPS.find(a => a.type === appType);

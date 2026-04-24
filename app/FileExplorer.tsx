@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, updateNode, type FSNode } from './fileSystem';
 
 interface FileExplorerProps {
+  mode?: 'desktop' | 'explorer';
   initialFolderId?: string;
   onOpenFile?: (node: FSNode) => void;
   onFSChange?: () => void;
 }
 
-export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile, onFSChange }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', onOpenFile, onFSChange }: FileExplorerProps) {
+  const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
   const [history, setHistory] = useState<string[]>([initialFolderId]);
@@ -94,45 +96,52 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile, 
   const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : items.length >= 0 ? currentFolder : currentFolder;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900" onClick={() => setContextMenu(null)}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 px-2 py-1 bg-zinc-800 border-b border-zinc-700">
-        <button
-          onClick={goBack}
-          disabled={historyIdx <= 0}
-          className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center disabled:opacity-30"
-        >←</button>
-        <button
-          onClick={goForward}
-          disabled={historyIdx >= history.length - 1}
-          className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center disabled:opacity-30"
-        >→</button>
-        <button
-          onClick={() => currentFolder !== 'desktop' && currentFolder !== 'root' ? goBack() : null}
-          className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center"
-        >↑</button>
-        <div className="flex-1 h-6 px-2 mx-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-zinc-400 flex items-center">
-          {pathLabel}
+    <div className={`flex flex-col h-full ${isDesktop ? 'bg-transparent' : 'bg-zinc-900'}`} onClick={() => setContextMenu(null)}>
+      {/* Toolbar — explorer only */}
+      {!isDesktop && (
+        <div className="flex items-center gap-1 px-2 py-1 bg-zinc-800 border-b border-zinc-700">
+          <button
+            onClick={goBack}
+            disabled={historyIdx <= 0}
+            className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center disabled:opacity-30"
+          >←</button>
+          <button
+            onClick={goForward}
+            disabled={historyIdx >= history.length - 1}
+            className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center disabled:opacity-30"
+          >→</button>
+          <button
+            onClick={() => currentFolder !== 'desktop' && currentFolder !== 'root' ? goBack() : null}
+            className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center"
+          >↑</button>
+          <div className="flex-1 h-6 px-2 mx-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-zinc-400 flex items-center">
+            {pathLabel}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Content */}
       <div
-        className="flex-1 overflow-auto p-3"
+        className={`flex-1 overflow-auto ${isDesktop ? 'p-4' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
       >
-        {items.length === 0 ? (
+        {items.length === 0 && !isDesktop ? (
           <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
         ) : (
-          <div className="grid grid-cols-4 gap-1">
+          <div className={isDesktop
+            ? 'flex flex-col flex-wrap gap-2 content-start h-full'
+            : 'grid grid-cols-4 gap-1'
+          }>
             {items.map(node => (
               <button
                 key={node.id}
-                className="flex flex-col items-center p-2 rounded hover:bg-white/10 transition-colors"
+                className={`flex flex-col items-center rounded hover:bg-white/10 transition-colors ${
+                  isDesktop ? 'w-20 p-2' : 'p-2'
+                }`}
                 onDoubleClick={() => handleDoubleClick(node)}
                 onContextMenu={(e) => handleContextMenu(e, node)}
               >
-                <span className="text-2xl">{getIconForNode(node)}</span>
+                <span className={isDesktop ? 'text-3xl' : 'text-2xl'}>{getIconForNode(node)}</span>
                 {renaming === node.id ? (
                   <input
                     value={renameValue}
@@ -143,7 +152,11 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile, 
                     autoFocus
                   />
                 ) : (
-                  <span className="text-[10px] text-zinc-300 mt-1 text-center leading-tight truncate w-full">
+                  <span className={`mt-1 text-center leading-tight truncate w-full ${
+                    isDesktop
+                      ? 'text-[11px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
+                      : 'text-[10px] text-zinc-300'
+                  }`}>
                     {node.name}
                   </span>
                 )}
@@ -181,10 +194,12 @@ export default function FileExplorer({ initialFolderId = 'desktop', onOpenFile, 
         </div>
       )}
 
-      {/* Status bar */}
-      <div className="flex items-center px-3 py-1 bg-zinc-800 border-t border-zinc-700 text-[10px] text-zinc-500">
-        {items.length}개 항목
-      </div>
+      {/* Status bar — explorer only */}
+      {!isDesktop && (
+        <div className="flex items-center px-3 py-1 bg-zinc-800 border-t border-zinc-700 text-[10px] text-zinc-500">
+          {items.length}개 항목
+        </div>
+      )}
     </div>
   );
 }

@@ -79,6 +79,7 @@ interface WindowState {
   h: number;
   minimized: boolean;
   maximized: boolean;
+  snapZone: SnapZone;
   zIndex: number;
   browserUrl?: string;
 }
@@ -237,6 +238,7 @@ export default function Home() {
         h: app.type === 'notepad' ? 480 : 420,
         minimized: false,
         maximized: false,
+        snapZone: null,
         zIndex: topZIndex(),
         browserUrl: '',
       }];
@@ -256,7 +258,11 @@ export default function Home() {
   }, [topZIndex]);
 
   const toggleMaximize = useCallback((id: string) => {
-    setWindows(prev => prev.map(w => w.id === id ? { ...w, maximized: !w.maximized, zIndex: topZIndex() } : w));
+    setWindows(prev => prev.map(w => {
+      if (w.id !== id) return w;
+      const goingMax = !w.maximized;
+      return { ...w, maximized: goingMax, snapZone: goingMax ? 'fullscreen' : null, zIndex: topZIndex() };
+    }));
   }, [topZIndex]);
 
   const navigateBrowser = useCallback((id: string, url: string) => {
@@ -293,7 +299,7 @@ export default function Home() {
       let y = e.clientY - dr.top - drag.offsetY;
       x = Math.max(-200, Math.min(x, dr.width - 80));
       y = Math.max(0, Math.min(y, dr.height - 40));
-      setWindows(prev => prev.map(w => w.id === drag.id ? { ...w, x, y, maximized: false } : w));
+      setWindows(prev => prev.map(w => w.id === drag.id ? { ...w, x, y, maximized: false, snapZone: null } : w));
       setSnapPreview(detectSnap(e.clientX, e.clientY, dr));
     } else {
       const dx = e.clientX - drag.startX;
@@ -320,20 +326,11 @@ export default function Home() {
 
   const handlePointerUp = useCallback(() => {
     if (drag?.kind === 'move' && snapPreview) {
-      const desktop = desktopRef.current;
-      if (desktop) {
-        const dr = desktop.getBoundingClientRect();
-        const rect = SNAP_RECTS[snapPreview];
-        const toNum = (v: string, total: number) => v.endsWith('%') ? total * parseFloat(v) / 100 : parseFloat(v);
-        setWindows(prev => prev.map(w => w.id === drag.id ? {
-          ...w,
-          x: toNum(rect.left, dr.width),
-          y: toNum(rect.top, dr.height),
-          w: toNum(rect.width, dr.width),
-          h: toNum(rect.height, dr.height),
-          maximized: snapPreview === 'fullscreen',
-        } : w));
-      }
+      setWindows(prev => prev.map(w => w.id === drag.id ? {
+        ...w,
+        snapZone: snapPreview,
+        maximized: snapPreview === 'fullscreen',
+      } : w));
     }
     setDrag(null);
     setSnapPreview(null);
@@ -374,7 +371,7 @@ export default function Home() {
         )}
 
         {/* Desktop Icons */}
-        <div className="absolute top-4 left-4 flex flex-col gap-2">
+        <div className="absolute flex flex-col gap-2" style={{ top: '2%', left: '1.5%' }}>
           {APPS.map(app => (
             <button
               key={app.id}
@@ -394,19 +391,30 @@ export default function Home() {
           if (win.minimized) return null;
           const isTop = win.zIndex === zCounter;
           const isMax = win.maximized;
+          const snap = win.snapZone ? SNAP_RECTS[win.snapZone] : null;
+          const isSnapped = !!snap;
           return (
             <div
               key={win.id}
               id={`win-${win.id}`}
               className="absolute flex flex-col shadow-2xl"
-              style={{
-                left: isMax ? 0 : win.x,
-                top: isMax ? 0 : win.y,
-                width: isMax ? '100%' : win.w,
-                height: isMax ? '100%' : win.h,
+              style={isSnapped ? {
+                left: snap.left,
+                top: snap.top,
+                width: snap.width,
+                height: snap.height,
                 zIndex: win.zIndex,
                 border: isMax ? 'none' : '1px solid rgba(255,255,255,0.15)',
-                borderRadius: isMax ? 0 : 8,
+                borderRadius: isMax ? 0 : 4,
+                overflow: 'hidden',
+              } : {
+                left: win.x,
+                top: win.y,
+                width: win.w,
+                height: win.h,
+                zIndex: win.zIndex,
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 8,
                 overflow: 'hidden',
               }}
               onPointerDown={() => focusWindow(win.id)}
@@ -420,7 +428,7 @@ export default function Home() {
                     : 'linear-gradient(180deg, #2e2e3a 0%, #22222e 100%)',
                   cursor: isMax ? 'default' : 'move',
                 }}
-                onPointerDown={(e) => { if (!isMax) handleTitlePointerDown(win.id, e); }}
+                onPointerDown={(e) => { if (!isMax) { if (isSnapped) { setWindows(prev => prev.map(w => w.id === win.id ? { ...w, snapZone: null } : w)); } handleTitlePointerDown(win.id, e); } }}
                 onDoubleClick={() => toggleMaximize(win.id)}
               >
                 <span className="text-sm">{win.app.icon}</span>
@@ -453,7 +461,7 @@ export default function Home() {
                 )}
               </div>
               {/* Resize handles */}
-              {!isMax && <>
+              {!isMax && !isSnapped && <>
                 <div className="absolute top-0 left-0 right-0 h-1 cursor-n-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'n', e)} />
                 <div className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 's', e)} />
                 <div className="absolute top-0 left-0 bottom-0 w-1 cursor-w-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'w', e)} />

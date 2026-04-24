@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, updateNode, type FSNode } from './fileSystem';
+import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, emptyTrash, updateNode, type FSNode } from './fileSystem';
 
 interface FileExplorerProps {
   mode?: 'desktop' | 'explorer';
@@ -48,12 +48,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [historyIdx, history]);
 
   const handleDoubleClick = useCallback((node: FSNode) => {
-    if (node.type === 'folder') {
+    if (node.type === 'folder' && !isDesktop) {
       navigateTo(node.id);
     } else if (onOpenFile) {
       onOpenFile(node);
     }
-  }, [navigateTo, onOpenFile]);
+  }, [navigateTo, onOpenFile, isDesktop]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, node?: FSNode) => {
     e.preventDefault();
@@ -162,6 +162,25 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 )}
               </button>
             ))}
+            {isDesktop && (
+              <button
+                className="flex flex-col items-center w-20 p-2 rounded hover:bg-white/10 transition-colors"
+                onDoubleClick={() => {
+                  const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
+                  onOpenFile?.(trashNode);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setContextMenu({ x: e.clientX, y: e.clientY, node: { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' } as FSNode });
+                }}
+              >
+                <span className="text-3xl">🗑️</span>
+                <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  휴지통
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -180,14 +199,24 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {contextMenu.node ? (<>
-            <button onClick={() => handleDoubleClick(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
-            {contextMenu.node.type !== 'app' && (<>
-              <button onClick={() => startRename(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름 변경</button>
+          {contextMenu.node ? (
+            contextMenu.node.id === '__trash__' ? (<>
+              <button onClick={() => {
+                const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
+                onOpenFile?.(trashNode);
+                setContextMenu(null);
+              }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
               <div className="border-t border-white/10 my-0.5" />
-              <button onClick={() => handleDelete(contextMenu.node!.id)} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">삭제</button>
-            </>)}
-          </>) : (<>
+              <button onClick={() => { emptyTrash(); refresh(); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">휴지통 비우기</button>
+            </>) : (<>
+              <button onClick={() => handleDoubleClick(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
+              {contextMenu.node.type !== 'app' && (<>
+                <button onClick={() => startRename(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름 변경</button>
+                <div className="border-t border-white/10 my-0.5" />
+                <button onClick={() => handleDelete(contextMenu.node!.id)} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">삭제</button>
+              </>)}
+            </>)
+          ) : (<>
             <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 텍스트 파일</button>
             <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 폴더</button>
           </>)}

@@ -78,8 +78,45 @@ interface WindowState {
   w: number;
   h: number;
   minimized: boolean;
+  maximized: boolean;
   zIndex: number;
   browserUrl?: string;
+}
+
+const MIN_W = 320;
+const MIN_H = 200;
+const TASKBAR_H = 40;
+const SNAP_EDGE_PX = 16;
+
+type SnapZone = 'left' | 'right' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'fullscreen' | null;
+
+const SNAP_ZONES: { test: (px: number, py: number) => boolean; zone: NonNullable<SnapZone> }[] = [
+  { zone: 'top-left',     test: (px, py) => px <= SNAP_EDGE_PX && py <= SNAP_EDGE_PX },
+  { zone: 'top-right',    test: (px, py) => px >= 100 - SNAP_EDGE_PX && py <= SNAP_EDGE_PX },
+  { zone: 'bottom-left',  test: (px, py) => px <= SNAP_EDGE_PX && py >= 100 - SNAP_EDGE_PX },
+  { zone: 'bottom-right', test: (px, py) => px >= 100 - SNAP_EDGE_PX && py >= 100 - SNAP_EDGE_PX },
+  { zone: 'fullscreen',   test: (_px, py) => py <= 5 },
+  { zone: 'left',         test: (px) => px <= 3 },
+  { zone: 'right',        test: (px) => px >= 97 },
+];
+
+const SNAP_RECTS: Record<NonNullable<SnapZone>, { left: string; top: string; width: string; height: string }> = {
+  'fullscreen':   { left: '0',   top: '0',   width: '100%', height: '100%' },
+  'left':         { left: '0',   top: '0',   width: '50%',  height: '100%' },
+  'right':        { left: '50%', top: '0',   width: '50%',  height: '100%' },
+  'top-left':     { left: '0',   top: '0',   width: '50%',  height: '50%' },
+  'top-right':    { left: '50%', top: '0',   width: '50%',  height: '50%' },
+  'bottom-left':  { left: '0',   top: '50%', width: '50%',  height: '50%' },
+  'bottom-right': { left: '50%', top: '50%', width: '50%',  height: '50%' },
+};
+
+function detectSnap(cursorX: number, cursorY: number, container: DOMRect): SnapZone {
+  const px = ((cursorX - container.left) / container.width) * 100;
+  const py = ((cursorY - container.top) / container.height) * 100;
+  for (const { test, zone } of SNAP_ZONES) {
+    if (test(px, py)) return zone;
+  }
+  return null;
 }
 
 let zCounter = 1;
@@ -169,18 +206,27 @@ function NotepadContent({ text }: { text: string }) {
   );
 }
 
+type DragMode =
+  | { kind: 'move'; id: string; offsetX: number; offsetY: number }
+  | { kind: 'resize'; id: string; edge: string; startX: number; startY: number; startW: number; startH: number; startWX: number; startWY: number };
+
 export default function Home() {
   const [windows, setWindows] = useState<WindowState[]>([]);
-  const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const [drag, setDrag] = useState<DragMode | null>(null);
+  const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
+
+  const topZIndex = useCallback(() => {
+    return ++zCounter;
+  }, []);
 
   const openApp = useCallback((app: AppDef) => {
     setStartMenuOpen(false);
     setWindows(prev => {
       const existing = prev.find(w => w.app.id === app.id);
       if (existing) {
-        return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: ++zCounter } : w);
+        return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
       }
       return [...prev, {
         id: `${app.id}-${Date.now()}`,
@@ -190,11 +236,12 @@ export default function Home() {
         w: app.type === 'notepad' ? 520 : 640,
         h: app.type === 'notepad' ? 480 : 420,
         minimized: false,
-        zIndex: ++zCounter,
+        maximized: false,
+        zIndex: topZIndex(),
         browserUrl: '',
       }];
     });
-  }, []);
+  }, [topZIndex]);
 
   const closeWindow = useCallback((id: string) => {
     setWindows(prev => prev.filter(w => w.id !== id));
@@ -205,34 +252,92 @@ export default function Home() {
   }, []);
 
   const focusWindow = useCallback((id: string) => {
-    setWindows(prev => prev.map(w => w.id === id ? { ...w, zIndex: ++zCounter, minimized: false } : w));
-  }, []);
+    setWindows(prev => prev.map(w => w.id === id ? { ...w, zIndex: topZIndex(), minimized: false } : w));
+  }, [topZIndex]);
+
+  const toggleMaximize = useCallback((id: string) => {
+    setWindows(prev => prev.map(w => w.id === id ? { ...w, maximized: !w.maximized, zIndex: topZIndex() } : w));
+  }, [topZIndex]);
 
   const navigateBrowser = useCallback((id: string, url: string) => {
     setWindows(prev => prev.map(w => w.id === id ? { ...w, browserUrl: url } : w));
   }, []);
 
-  const handlePointerDown = useCallback((id: string, e: React.PointerEvent) => {
+  const handleTitlePointerDown = useCallback((id: string, e: React.PointerEvent) => {
     focusWindow(id);
     const win = document.getElementById(`win-${id}`);
     if (!win) return;
     const rect = win.getBoundingClientRect();
-    setDragging({ id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top });
+    setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top });
+  }, [focusWindow]);
+
+  const handleResizePointerDown = useCallback((id: string, edge: string, e: React.PointerEvent) => {
+    e.stopPropagation();
+    focusWindow(id);
+    setWindows(prev => {
+      const w = prev.find(win => win.id === id);
+      if (!w) return prev;
+      setDrag({ kind: 'resize', id, edge, startX: e.clientX, startY: e.clientY, startW: w.w, startH: w.h, startWX: w.x, startWY: w.y });
+      return prev;
+    });
   }, [focusWindow]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging) return;
+    if (!drag) return;
     const desktop = desktopRef.current;
     if (!desktop) return;
     const dr = desktop.getBoundingClientRect();
-    const x = e.clientX - dr.left - dragging.offsetX;
-    const y = e.clientY - dr.top - dragging.offsetY;
-    setWindows(prev => prev.map(w => w.id === dragging.id ? { ...w, x: Math.max(0, x), y: Math.max(0, y) } : w));
-  }, [dragging]);
+
+    if (drag.kind === 'move') {
+      let x = e.clientX - dr.left - drag.offsetX;
+      let y = e.clientY - dr.top - drag.offsetY;
+      x = Math.max(-200, Math.min(x, dr.width - 80));
+      y = Math.max(0, Math.min(y, dr.height - 40));
+      setWindows(prev => prev.map(w => w.id === drag.id ? { ...w, x, y, maximized: false } : w));
+      setSnapPreview(detectSnap(e.clientX, e.clientY, dr));
+    } else {
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      setWindows(prev => prev.map(w => {
+        if (w.id !== drag.id) return w;
+        const next = { ...w };
+        if (drag.edge.includes('e')) next.w = Math.max(MIN_W, drag.startW + dx);
+        if (drag.edge.includes('s')) next.h = Math.max(MIN_H, drag.startH + dy);
+        if (drag.edge.includes('w')) {
+          const newW = Math.max(MIN_W, drag.startW - dx);
+          next.x = drag.startWX + (drag.startW - newW);
+          next.w = newW;
+        }
+        if (drag.edge.includes('n')) {
+          const newH = Math.max(MIN_H, drag.startH - dy);
+          next.y = drag.startWY + (drag.startH - newH);
+          next.h = newH;
+        }
+        return next;
+      }));
+    }
+  }, [drag]);
 
   const handlePointerUp = useCallback(() => {
-    setDragging(null);
-  }, []);
+    if (drag?.kind === 'move' && snapPreview) {
+      const desktop = desktopRef.current;
+      if (desktop) {
+        const dr = desktop.getBoundingClientRect();
+        const rect = SNAP_RECTS[snapPreview];
+        const toNum = (v: string, total: number) => v.endsWith('%') ? total * parseFloat(v) / 100 : parseFloat(v);
+        setWindows(prev => prev.map(w => w.id === drag.id ? {
+          ...w,
+          x: toNum(rect.left, dr.width),
+          y: toNum(rect.top, dr.height),
+          w: toNum(rect.width, dr.width),
+          h: toNum(rect.height, dr.height),
+          maximized: snapPreview === 'fullscreen',
+        } : w));
+      }
+    }
+    setDrag(null);
+    setSnapPreview(null);
+  }, [drag, snapPreview]);
 
   const [timeStr, setTimeStr] = useState('');
   useEffect(() => {
@@ -255,6 +360,19 @@ export default function Home() {
         style={{ background: 'linear-gradient(135deg, #1a3a4a 0%, #0d1f2d 50%, #1a2a3a 100%)' }}
         onClick={() => setStartMenuOpen(false)}
       >
+        {/* Snap Preview */}
+        {snapPreview && drag?.kind === 'move' && (
+          <div
+            className="absolute rounded-lg pointer-events-none transition-all duration-150"
+            style={{
+              ...SNAP_RECTS[snapPreview],
+              background: 'rgba(100, 140, 255, 0.15)',
+              border: '2px solid rgba(100, 140, 255, 0.4)',
+              zIndex: 9998,
+            }}
+          />
+        )}
+
         {/* Desktop Icons */}
         <div className="absolute top-4 left-4 flex flex-col gap-2">
           {APPS.map(app => (
@@ -272,51 +390,82 @@ export default function Home() {
         </div>
 
         {/* Windows */}
-        {windows.map(win => win.minimized ? null : (
-          <div
-            key={win.id}
-            id={`win-${win.id}`}
-            className="absolute flex flex-col rounded-lg overflow-hidden shadow-2xl"
-            style={{
-              left: win.x, top: win.y, width: win.w, height: win.h,
-              zIndex: win.zIndex,
-              border: '1px solid rgba(255,255,255,0.15)',
-            }}
-            onClick={() => focusWindow(win.id)}
-          >
-            {/* Title Bar */}
+        {windows.map(win => {
+          if (win.minimized) return null;
+          const isTop = win.zIndex === zCounter;
+          const isMax = win.maximized;
+          return (
             <div
-              className="h-8 flex items-center px-3 gap-2 shrink-0 cursor-move"
-              style={{ background: 'linear-gradient(180deg, #3a3a50 0%, #2a2a3a 100%)' }}
-              onPointerDown={(e) => handlePointerDown(win.id, e)}
+              key={win.id}
+              id={`win-${win.id}`}
+              className="absolute flex flex-col shadow-2xl"
+              style={{
+                left: isMax ? 0 : win.x,
+                top: isMax ? 0 : win.y,
+                width: isMax ? '100%' : win.w,
+                height: isMax ? '100%' : win.h,
+                zIndex: win.zIndex,
+                border: isMax ? 'none' : '1px solid rgba(255,255,255,0.15)',
+                borderRadius: isMax ? 0 : 8,
+                overflow: 'hidden',
+              }}
+              onPointerDown={() => focusWindow(win.id)}
             >
-              <span className="text-sm">{win.app.icon}</span>
-              <span className="text-xs text-white/80 flex-1">{win.app.title}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
-              >─</button>
-              <button
-                onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-red-500/80 hover:text-white text-xs"
-              >✕</button>
+              {/* Title Bar */}
+              <div
+                className="h-8 flex items-center px-3 gap-2 shrink-0"
+                style={{
+                  background: isTop
+                    ? 'linear-gradient(180deg, #4a4a65 0%, #35354a 100%)'
+                    : 'linear-gradient(180deg, #2e2e3a 0%, #22222e 100%)',
+                  cursor: isMax ? 'default' : 'move',
+                }}
+                onPointerDown={(e) => { if (!isMax) handleTitlePointerDown(win.id, e); }}
+                onDoubleClick={() => toggleMaximize(win.id)}
+              >
+                <span className="text-sm">{win.app.icon}</span>
+                <span className={`text-xs flex-1 ${isTop ? 'text-white/90' : 'text-white/40'}`}>{win.app.title}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
+                  className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
+                >─</button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
+                  className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
+                >{isMax ? '❐' : '□'}</button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
+                  className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-red-500/80 hover:text-white text-xs"
+                >✕</button>
+              </div>
+              {/* Content */}
+              <div className="flex-1 overflow-hidden">
+                {win.app.type === 'browser' && (
+                  <BrowserContent win={win} onNavigate={navigateBrowser} />
+                )}
+                {win.app.type === 'notepad' && (
+                  <NotepadContent text={win.app.text || ''} />
+                )}
+                {win.app.type === 'empty' && (
+                  <div className="h-full bg-zinc-900 flex items-center justify-center">
+                    <span className="text-zinc-500 text-sm">{win.app.title}</span>
+                  </div>
+                )}
+              </div>
+              {/* Resize handles */}
+              {!isMax && <>
+                <div className="absolute top-0 left-0 right-0 h-1 cursor-n-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'n', e)} />
+                <div className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 's', e)} />
+                <div className="absolute top-0 left-0 bottom-0 w-1 cursor-w-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'w', e)} />
+                <div className="absolute top-0 right-0 bottom-0 w-1 cursor-e-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'e', e)} />
+                <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'nw', e)} />
+                <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'ne', e)} />
+                <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'sw', e)} />
+                <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'se', e)} />
+              </>}
             </div>
-            {/* Content */}
-            <div className="flex-1 overflow-hidden">
-              {win.app.type === 'browser' && (
-                <BrowserContent win={win} onNavigate={navigateBrowser} />
-              )}
-              {win.app.type === 'notepad' && (
-                <NotepadContent text={win.app.text || ''} />
-              )}
-              {win.app.type === 'empty' && (
-                <div className="h-full bg-zinc-900 flex items-center justify-center">
-                  <span className="text-zinc-500 text-sm">{win.app.title}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Taskbar */}
@@ -334,17 +483,23 @@ export default function Home() {
         </button>
         <div className="w-px h-5 bg-white/10 mx-1" />
         <div className="flex-1 flex gap-1 overflow-hidden">
-          {windows.map(win => (
-            <button
-              key={win.id}
-              onClick={() => focusWindow(win.id)}
-              className="h-7 px-3 rounded flex items-center gap-1.5 text-xs text-white/70 hover:bg-white/10 transition-colors max-w-[160px]"
-              style={{ background: win.minimized ? 'transparent' : 'rgba(255,255,255,0.08)' }}
-            >
-              <span className="text-sm">{win.app.icon}</span>
-              <span className="truncate">{win.app.title}</span>
-            </button>
-          ))}
+          {windows.map(win => {
+            const isTop = win.zIndex === zCounter;
+            return (
+              <button
+                key={win.id}
+                onClick={() => !win.minimized && isTop ? minimizeWindow(win.id) : focusWindow(win.id)}
+                className={`h-7 px-3 rounded flex items-center gap-1.5 text-xs transition-colors max-w-[160px] ${isTop && !win.minimized ? 'text-white/90' : 'text-white/50'}`}
+                style={{
+                  background: isTop && !win.minimized ? 'rgba(255,255,255,0.15)' : win.minimized ? 'transparent' : 'rgba(255,255,255,0.06)',
+                  borderBottom: isTop && !win.minimized ? '2px solid rgba(120,140,255,0.6)' : '2px solid transparent',
+                }}
+              >
+                <span className="text-sm">{win.app.icon}</span>
+                <span className="truncate">{win.app.title}</span>
+              </button>
+            );
+          })}
         </div>
         <div className="text-xs text-white/50 px-2">{timeStr}</div>
       </div>

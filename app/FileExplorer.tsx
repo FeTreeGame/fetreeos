@@ -73,9 +73,10 @@ interface FileExplorerProps {
   onFSChange?: () => void;
   onIconDragChange?: (info: IconDragInfo | null) => void;
   crossDragging?: boolean;
+  crossDropTarget?: string | null;
 }
 
-export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging, crossDropTarget }: FileExplorerProps) {
   const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
@@ -331,9 +332,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       for (const id of allIds) {
         const pos = iconPositions[id];
         if (!pos) continue;
-        const cx = pos.col * CELL_W + CELL_W / 2;
-        const cy = pos.row * CELL_H + CELL_H / 2;
-        if (cx >= left && cx <= right && cy >= top && cy <= bottom) {
+        const iconLeft = pos.col * CELL_W;
+        const iconTop = pos.row * CELL_H;
+        const iconRight = iconLeft + CELL_W;
+        const iconBottom = iconTop + CELL_H;
+        if (iconRight > left && iconLeft < right && iconBottom > top && iconTop < bottom) {
           if (selBox.additive && selBox.baseSelection.has(id)) {
             hit.delete(id);
           } else {
@@ -490,10 +493,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const icons = el.querySelectorAll<HTMLElement>('[data-node-id]');
       for (const icon of icons) {
         const ir = icon.getBoundingClientRect();
-        const cx = ir.left + ir.width / 2 - rect.left;
-        const cy = ir.top + ir.height / 2 - rect.top;
+        const iconLeft = ir.left - rect.left;
+        const iconTop = ir.top - rect.top;
+        const iconRight = iconLeft + ir.width;
+        const iconBottom = iconTop + ir.height;
         const id = icon.getAttribute('data-node-id')!;
-        if (cx >= left && cx <= right && cy >= top && cy <= bottom) {
+        if (iconRight > left && iconLeft < right && iconBottom > top && iconTop < bottom) {
           if (selBox.additive && selBox.baseSelection.has(id)) hit.delete(id);
           else hit.add(id);
         }
@@ -677,9 +682,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               const isTrash = node.id === 'trash';
               const isDragging = iconDrag?.active && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has(node.id)));
               const isSelected = selectedIds.has(node.id);
+              const isCrossDropReceiver = crossDropTarget === node.id;
               return (
                 <button
                   key={node.id}
+                  data-node-id={node.id}
                   className="absolute flex flex-col items-center justify-center rounded group"
                   style={{
                     left: pos.col * CELL_W,
@@ -692,6 +699,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                   onPointerDown={(e) => handleIconPointerDown(node.id, e)}
                   onDoubleClick={() => {
                     if (iconDrag?.active) return;
+                    setSelectedIds(new Set());
                     if (isTrash) { onOpenFile?.(TRASH_NODE); return; }
                     handleDoubleClick(node);
                   }}
@@ -700,7 +708,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     handleContextMenu(e, node);
                   }}
                 >
-                  <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : !iconDrag?.active ? 'group-hover:bg-blue-500/10' : ''}`} />
+                  <div className={`absolute inset-0 rounded transition-colors ${isCrossDropReceiver ? 'bg-green-500/15 border-2 border-green-500/50' : isSelected ? 'bg-blue-500/20' : !iconDrag?.active ? 'group-hover:bg-blue-500/10' : ''}`} />
                   <span className="text-3xl relative">{isTrash ? '🗑️' : getIconForNode(node)}</span>
                   {renaming === node.id ? (
                     <input

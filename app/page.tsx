@@ -75,6 +75,7 @@ export default function Home() {
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
   const [iconDragInfo, setIconDragInfo] = useState<IconDragInfo | null>(null);
+  const [crossDropTarget, setCrossDropTarget] = useState<string | null>(null);
   const explorerRefs = useRef<Map<string, { el: HTMLElement; folderId: string }>>(new Map());
 
   const topZIndex = useCallback(() => {
@@ -208,6 +209,16 @@ export default function Home() {
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
       setIconDragInfo(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY } : null);
+      if (iconDragInfo.sourceFolder !== 'desktop') {
+        const trashEl = document.querySelector<HTMLElement>('[data-node-id="trash"]');
+        if (trashEl) {
+          const tr = trashEl.getBoundingClientRect();
+          const over = e.clientX >= tr.left && e.clientX <= tr.right && e.clientY >= tr.top && e.clientY <= tr.bottom;
+          setCrossDropTarget(over ? 'trash' : null);
+        }
+      } else {
+        setCrossDropTarget(null);
+      }
     }
     if (!drag) return;
     const desktop = desktopRef.current;
@@ -264,17 +275,24 @@ export default function Home() {
           }
         }
       }
-      console.log('[cross-drag] drop:', { targetFolder, source: iconDragInfo.sourceFolder, topWinEl: topWinEl?.id });
+      const trashEl = document.querySelector<HTMLElement>('[data-node-id="trash"]');
+      if (trashEl && iconDragInfo.sourceFolder !== 'desktop') {
+        const tr = trashEl.getBoundingClientRect();
+        if (e.clientX >= tr.left && e.clientX <= tr.right && e.clientY >= tr.top && e.clientY <= tr.bottom) {
+          targetFolder = 'trash';
+          topWinEl = null;
+        }
+      }
       if (targetFolder && targetFolder !== iconDragInfo.sourceFolder) {
         moveNodes(iconDragInfo.ids, targetFolder);
         refreshDesktop();
         if (topWinEl) {
           const winId = topWinEl.id.replace(/^win-/, '');
-          console.log('[cross-drag] focusWindow:', winId);
           setTimeout(() => focusWindow(winId), 0);
         }
       }
       setIconDragInfo(null);
+      setCrossDropTarget(null);
     }
     if (drag?.kind === 'move' && snapPreview) {
       setWindows(prev => prev.map(w => w.id === drag.id ? {
@@ -318,7 +336,7 @@ export default function Home() {
 
         {/* Desktop Icons — FileExplorer desktop mode */}
         <div className="absolute inset-0">
-          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} crossDragging={!!iconDragInfo && iconDragInfo.sourceFolder !== 'desktop'} />
+          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} crossDragging={!!iconDragInfo && iconDragInfo.sourceFolder !== 'desktop'} crossDropTarget={crossDropTarget} />
         </div>
 
         {/* Windows */}

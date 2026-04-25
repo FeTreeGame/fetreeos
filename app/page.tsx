@@ -251,6 +251,7 @@ export default function Home() {
       const allDropTargets = document.querySelectorAll<HTMLElement>('[data-drop-folder]');
       let targetFolder: string | null = null;
       let topZ = -1;
+      let topWinEl: Element | null = null;
       for (const el of allDropTargets) {
         const rect = el.getBoundingClientRect();
         if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
@@ -259,12 +260,19 @@ export default function Home() {
           if (z >= topZ) {
             topZ = z;
             targetFolder = el.getAttribute('data-drop-folder');
+            topWinEl = winEl;
           }
         }
       }
+      console.log('[cross-drag] drop:', { targetFolder, source: iconDragInfo.sourceFolder, topWinEl: topWinEl?.id });
       if (targetFolder && targetFolder !== iconDragInfo.sourceFolder) {
         moveNodes(iconDragInfo.ids, targetFolder);
         refreshDesktop();
+        if (topWinEl) {
+          const winId = topWinEl.id.replace(/^win-/, '');
+          console.log('[cross-drag] focusWindow:', winId);
+          setTimeout(() => focusWindow(winId), 0);
+        }
       }
       setIconDragInfo(null);
     }
@@ -279,7 +287,7 @@ export default function Home() {
     }
     setDrag(null);
     setSnapPreview(null);
-  }, [drag, snapPreview, iconDragInfo, refreshDesktop]);
+  }, [drag, snapPreview, iconDragInfo, refreshDesktop, focusWindow]);
 
 
   return (
@@ -310,7 +318,7 @@ export default function Home() {
 
         {/* Desktop Icons — FileExplorer desktop mode */}
         <div className="absolute inset-0">
-          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} />
+          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} crossDragging={!!iconDragInfo && iconDragInfo.sourceFolder !== 'desktop'} />
         </div>
 
         {/* Windows */}
@@ -443,25 +451,26 @@ export default function Home() {
           );
         })}
 
-        {/* Cross-drag ghost */}
-        {iconDragInfo && (
+        {/* Cross-drag ghost (only for non-desktop sources — desktop renders its own) */}
+        {iconDragInfo && iconDragInfo.sourceFolder !== 'desktop' && iconDragInfo.ghosts.map((g, i) => (
           <div
+            key={i}
             className="fixed flex flex-col items-center justify-center pointer-events-none"
             style={{
-              left: iconDragInfo.curX - 45,
-              top: iconDragInfo.curY - 45,
+              left: iconDragInfo.curX - 45 + i * 8,
+              top: iconDragInfo.curY - 45 + i * 8,
               width: 90,
               height: 90,
-              opacity: 0.7,
-              zIndex: 10001,
+              opacity: 0.7 - i * 0.1,
+              zIndex: 10001 - i,
             }}
           >
-            <span className="text-3xl">{iconDragInfo.icon}</span>
+            <span className="text-3xl">{g.icon}</span>
             <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              {iconDragInfo.name}
+              {g.name}
             </span>
           </div>
-        )}
+        ))}
       </div>
 
       {/* Taskbar */}

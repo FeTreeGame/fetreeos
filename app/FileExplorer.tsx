@@ -60,8 +60,7 @@ function autoPlace(
 export interface IconDragInfo {
   ids: string[];
   sourceFolder: string;
-  icon: string;
-  name: string;
+  ghosts: { icon: string; name: string }[];
   curX: number;
   curY: number;
 }
@@ -73,9 +72,10 @@ interface FileExplorerProps {
   onOpenFile?: (node: FSNode) => void;
   onFSChange?: () => void;
   onIconDragChange?: (info: IconDragInfo | null) => void;
+  crossDragging?: boolean;
 }
 
-export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging }: FileExplorerProps) {
   const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
@@ -134,6 +134,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (refreshKey !== undefined) {
       setItems(getChildren(currentFolder));
       if (isDesktop) setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
+      setIconDrag(null);
+      setDropTarget(null);
     }
   }, [refreshKey, currentFolder, isDesktop]);
 
@@ -263,7 +265,6 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [isDesktop, selectedIds]);
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
-    if (!isDesktop) return;
     const isAdditive = e.ctrlKey || e.metaKey;
     if (!isAdditive) setSelectedIds(new Set());
     const el = contentRef.current;
@@ -295,12 +296,14 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       if (!iconDrag.active) {
         const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
           ? [...selectedIds].filter(id => id !== 'trash') : [iconDrag.id];
-        const node = iconDrag.id === 'trash' ? TRASH_NODE : items.find(n => n.id === iconDrag.id);
+        const ghosts = movedIds.map(id => {
+          const n = id === 'trash' ? TRASH_NODE : items.find(nd => nd.id === id);
+          return { icon: n ? (id === 'trash' ? '🗑️' : getIconForNode(n)) : '📎', name: n?.name ?? '' };
+        });
         onIconDragChange?.({
           ids: movedIds,
           sourceFolder: currentFolder,
-          icon: node ? (iconDrag.id === 'trash' ? '🗑️' : getIconForNode(node)) : '📎',
-          name: node?.name ?? '',
+          ghosts,
           curX: e.clientX,
           curY: e.clientY,
         });
@@ -448,29 +451,63 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange, onIconDragChange]);
 
   const handleExplorerPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!iconDrag) return;
-    const dx = e.clientX - iconDrag.startX;
-    const dy = e.clientY - iconDrag.startY;
-    if (!iconDrag.active && Math.sqrt(dx * dx + dy * dy) < 5) return;
-    if (!iconDrag.active) {
-      const node = items.find(n => n.id === iconDrag.id);
-      onIconDragChange?.({
-        ids: [iconDrag.id],
-        sourceFolder: currentFolder,
-        icon: node ? getIconForNode(node) : '📎',
-        name: node?.name ?? '',
-        curX: e.clientX,
-        curY: e.clientY,
-      });
+    if (iconDrag) {
+      const dx = e.clientX - iconDrag.startX;
+      const dy = e.clientY - iconDrag.startY;
+      if (!iconDrag.active && Math.sqrt(dx * dx + dy * dy) < 5) return;
+      if (!iconDrag.active) {
+        const dragIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+          ? [...selectedIds] : [iconDrag.id];
+        const ghosts = dragIds.map(id => {
+          const n = items.find(nd => nd.id === id);
+          return { icon: n ? getIconForNode(n) : '📎', name: n?.name ?? '' };
+        });
+        onIconDragChange?.({
+          ids: dragIds,
+          sourceFolder: currentFolder,
+          ghosts,
+          curX: e.clientX,
+          curY: e.clientY,
+        });
+      }
+      setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
+      return;
     }
-    setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
-  }, [iconDrag, currentFolder, onIconDragChange, items]);
+    if (selBox) {
+      const el = contentRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const curX = e.clientX - rect.left;
+      const curY = e.clientY - rect.top;
+      setSelBox(prev => prev ? { ...prev, curX, curY, active: true } : null);
+
+      const left = Math.min(selBox.startX, curX);
+      const top = Math.min(selBox.startY, curY);
+      const right = Math.max(selBox.startX, curX);
+      const bottom = Math.max(selBox.startY, curY);
+
+      const hit = new Set<string>(selBox.additive ? selBox.baseSelection : []);
+      const icons = el.querySelectorAll<HTMLElement>('[data-node-id]');
+      for (const icon of icons) {
+        const ir = icon.getBoundingClientRect();
+        const cx = ir.left + ir.width / 2 - rect.left;
+        const cy = ir.top + ir.height / 2 - rect.top;
+        const id = icon.getAttribute('data-node-id')!;
+        if (cx >= left && cx <= right && cy >= top && cy <= bottom) {
+          if (selBox.additive && selBox.baseSelection.has(id)) hit.delete(id);
+          else hit.add(id);
+        }
+      }
+      setSelectedIds(hit);
+    }
+  }, [iconDrag, selBox, currentFolder, onIconDragChange, items, selectedIds]);
 
   const handleExplorerPointerUp = useCallback(() => {
     if (iconDrag?.active) {
       onIconDragChange?.(null);
     }
     setIconDrag(null);
+    setSelBox(null);
   }, [iconDrag, onIconDragChange]);
 
   const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
@@ -551,9 +588,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       <div
         ref={contentRef}
         data-drop-folder={currentFolder}
-        className={`flex-1 overflow-auto ${isDesktop ? '' : 'p-3'}`}
+        className={`flex-1 overflow-auto relative ${isDesktop ? '' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
-        onPointerDown={isDesktop ? handleBgPointerDown : undefined}
+        onPointerDown={handleBgPointerDown}
         onPointerMove={isDesktop ? handleDesktopPointerMove : handleExplorerPointerMove}
         onPointerUp={isDesktop ? (e) => handleDesktopPointerUp(e) : handleExplorerPointerUp}
       >
@@ -682,8 +719,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 </button>
               );
             })}
-            {/* Ghost icons during drag */}
-            {iconDrag?.active && (() => {
+            {/* Ghost icons during drag (skip when page.tsx handles cross-drag ghosts) */}
+            {iconDrag?.active && !crossDragging && (() => {
               const rect = contentRef.current?.getBoundingClientRect();
               if (!rect) return null;
               const originPos = iconPositions[iconDrag.id];
@@ -740,7 +777,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               />
             )}
           </div>
-        ) : (
+        ) : (<>
           <div className="grid grid-cols-4 gap-1">
             {(() => {
               if (!explorerSort) return items;
@@ -752,7 +789,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             })().map(node => (
               <button
                 key={node.id}
-                className="flex flex-col items-center p-2 rounded hover:bg-white/10 transition-colors"
+                data-node-id={node.id}
+                className={`flex flex-col items-center p-2 rounded transition-colors ${selectedIds.has(node.id) ? 'bg-blue-500/20' : 'hover:bg-white/10'}`}
+                style={{ opacity: iconDrag?.active && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.has(node.id))) ? 0.3 : 1 }}
                 onPointerDown={(e) => handleIconPointerDown(node.id, e)}
                 onDoubleClick={() => handleDoubleClick(node)}
                 onContextMenu={(e) => handleContextMenu(e, node)}
@@ -775,7 +814,21 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               </button>
             ))}
           </div>
-        )}
+          {selBox?.active && (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: Math.min(selBox.startX, selBox.curX),
+                top: Math.min(selBox.startY, selBox.curY),
+                width: Math.abs(selBox.curX - selBox.startX),
+                height: Math.abs(selBox.curY - selBox.startY),
+                background: 'rgba(100, 140, 255, 0.1)',
+                border: '1px solid rgba(100, 140, 255, 0.5)',
+                zIndex: 10002,
+              }}
+            />
+          )}
+        </>)}
       </div>
 
       {/* Context Menu */}

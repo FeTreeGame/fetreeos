@@ -5,14 +5,11 @@ import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNod
 import ContextMenu from './ContextMenu';
 import { useDesktopDrag } from './useDesktopDrag';
 import { useExplorerDrag } from './useExplorerDrag';
+import { CELL_W, CELL_H, TRASH_NODE, TYPE_ORDER } from './constants';
 
-const CELL_W = 90;
-const CELL_H = 90;
 const ICON_POS_KEY = 'fetree-icon-positions';
 
 type IconPositions = Record<string, { col: number; row: number }>;
-const TYPE_ORDER: Record<string, number> = { app: 0, folder: 1, file: 2 };
-const TRASH_NODE: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
 
 function loadIconPositions(): IconPositions {
   if (typeof window === 'undefined') return {};

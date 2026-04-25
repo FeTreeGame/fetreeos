@@ -1,10 +1,7 @@
 import { useCallback } from 'react';
 import { getIconForNode, moveNodes, type FSNode } from './fileSystem';
 import type { IconDragInfo } from './FileExplorer';
-
-const CELL_W = 90;
-const CELL_H = 90;
-const TRASH_NODE: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
+import { CELL_W, CELL_H, TRASH_NODE } from './constants';
 
 type IconPositions = Record<string, { col: number; row: number }>;
 type DropTarget = { col: number; row: number; center: boolean; afterY: boolean };

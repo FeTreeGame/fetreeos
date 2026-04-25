@@ -57,15 +57,21 @@ function autoPlace(
   return result;
 }
 
+export interface IconDragInfo {
+  ids: string[];
+  sourceFolder: string;
+}
+
 interface FileExplorerProps {
   mode?: 'desktop' | 'explorer';
   initialFolderId?: string;
   refreshKey?: number;
   onOpenFile?: (node: FSNode) => void;
   onFSChange?: () => void;
+  onIconDragChange?: (info: IconDragInfo | null) => void;
 }
 
-export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange }: FileExplorerProps) {
   const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
@@ -85,6 +91,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [autoArrange, setAutoArrange] = useState(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('fetree-auto-arrange') === 'true';
+  });
+  const [desktopSort, setDesktopSort] = useState<'name' | 'type' | 'date'>(() => {
+    if (typeof window === 'undefined') return 'type';
+    return (localStorage.getItem('fetree-desktop-sort') as 'name' | 'type' | 'date') || 'type';
   });
   const [explorerSort, setExplorerSort] = useState<'name' | 'type' | 'date' | null>(null);
 
@@ -140,7 +150,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (!isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
     if (autoArrange) {
-      allItems.sort((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
+      if (desktopSort === 'name') allItems.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+      else if (desktopSort === 'date') allItems.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+      else allItems.sort((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
       const next: IconPositions = {};
       let idx = 0;
       for (let c = 0; c < gridSize.cols; c++) {
@@ -158,7 +170,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       setIconPositions(placed);
       saveIconPositions(placed);
     }
-  }, [isDesktop, items, gridSize, autoArrange]);
+  }, [isDesktop, items, gridSize, autoArrange, desktopSort]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);
@@ -271,6 +283,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const relY = ((e.clientY - rect.top) % CELL_H) / CELL_H;
       const center = relX > 0.2 && relX < 0.8 && relY > 0.2 && relY < 0.8;
 
+      if (!iconDrag.active) {
+        const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+          ? [...selectedIds].filter(id => id !== 'trash') : [iconDrag.id];
+        onIconDragChange?.({ ids: movedIds, sourceFolder: currentFolder });
+      }
       setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
       setDropTarget({ col, row, center, afterY: relY >= 0.5 });
       return;
@@ -308,7 +325,23 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     }
   }, [iconDrag, selBox, gridSize, items, iconPositions]);
 
-  const handleDesktopPointerUp = useCallback(() => {
+  const handleDesktopPointerUp = useCallback((e?: React.PointerEvent) => {
+    if (iconDrag?.active && e) {
+      const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+        ? [...selectedIds].filter(id => id !== 'trash')
+        : [iconDrag.id];
+      const els = document.elementsFromPoint(iconDrag.curX, iconDrag.curY);
+      const dropEl = els.find(el => el.getAttribute('data-drop-folder') && el !== contentRef.current);
+      if (dropEl) {
+        const targetFolder = dropEl.getAttribute('data-drop-folder')!;
+        moveNodes(movedIds, targetFolder);
+        setSelectedIds(new Set());
+        onIconDragChange?.(null);
+        setIconDrag(null); setDropTarget(null); setSelBox(null);
+        refresh();
+        return;
+      }
+    }
     if (iconDrag?.active && dropTarget) {
       const dragOrigin = iconPositions[iconDrag.id];
       if (!dragOrigin) { setIconDrag(null); setDropTarget(null); setSelBox(null); return; }
@@ -391,10 +424,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         return next;
       });
     }
+    onIconDragChange?.(null);
     setIconDrag(null);
     setDropTarget(null);
     setSelBox(null);
-  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange]);
+  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange, onIconDragChange]);
 
   const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
@@ -414,14 +448,17 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [items, gridSize]);
 
   const sortByName = useCallback(() => {
+    setDesktopSort('name'); localStorage.setItem('fetree-desktop-sort', 'name');
     sortAndPlace((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
   }, [sortAndPlace]);
 
   const sortByType = useCallback(() => {
+    setDesktopSort('type'); localStorage.setItem('fetree-desktop-sort', 'type');
     sortAndPlace((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
   }, [sortAndPlace]);
 
   const sortByDate = useCallback(() => {
+    setDesktopSort('date'); localStorage.setItem('fetree-desktop-sort', 'date');
     sortAndPlace((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
   }, [sortAndPlace]);
 
@@ -470,11 +507,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       {/* Content */}
       <div
         ref={contentRef}
+        data-drop-folder={currentFolder}
         className={`flex-1 overflow-auto ${isDesktop ? '' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
         onPointerDown={isDesktop ? handleBgPointerDown : undefined}
         onPointerMove={isDesktop ? handleDesktopPointerMove : undefined}
-        onPointerUp={isDesktop ? handleDesktopPointerUp : undefined}
+        onPointerUp={isDesktop ? (e) => handleDesktopPointerUp(e) : undefined}
       >
         {items.length === 0 && !isDesktop ? (
           <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
@@ -737,19 +775,25 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 폴더</button>
             <div className="border-t border-white/10 my-0.5" />
             {isDesktop ? (<>
-              <button onClick={sortByName} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름순 정렬</button>
-              <button onClick={sortByType} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">유형순 정렬</button>
-              <button onClick={sortByDate} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">날짜순 정렬</button>
-              <div className="border-t border-white/10 my-0.5" />
               <button onClick={() => {
-                const next = !autoArrange;
-                setAutoArrange(next);
-                localStorage.setItem('fetree-auto-arrange', String(next));
+                if (!autoArrange) {
+                  setAutoArrange(true);
+                  localStorage.setItem('fetree-auto-arrange', 'true');
+                } else {
+                  const cycle: ('type' | 'name' | 'date')[] = ['type', 'name', 'date'];
+                  const nextSort = cycle[(cycle.indexOf(desktopSort) + 1) % cycle.length];
+                  setDesktopSort(nextSort);
+                  localStorage.setItem('fetree-desktop-sort', nextSort);
+                }
                 setContextMenu(null);
               }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                {autoArrange ? '✓ ' : '   '}자동 정렬
+                {autoArrange ? '✓ ' : '   '}자동 정렬 ({desktopSort === 'name' ? '이름순' : desktopSort === 'date' ? '날짜순' : '유형순'})
               </button>
-              <button onClick={tidyGrid} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">그리드에 맞춤</button>
+              <button onClick={() => {
+                setAutoArrange(false);
+                localStorage.setItem('fetree-auto-arrange', 'false');
+                setContextMenu(null);
+              }} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 ${autoArrange ? 'text-white/70' : 'text-white/30'}`}>정렬 해제</button>
             </>) : (<>
               <button onClick={() => { setExplorerSort(explorerSort === 'name' ? null : 'name'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
                 {explorerSort === 'name' ? '✓ ' : '   '}이름순 정렬

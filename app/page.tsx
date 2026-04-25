@@ -4,10 +4,10 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { APPS, type AppDef } from './apps';
 import Clock from './Clock';
 import Notepad from './Notepad';
-import FileExplorer from './FileExplorer';
+import FileExplorer, { type IconDragInfo } from './FileExplorer';
 import Settings from './Settings';
 import Browser from './Browser';
-import { initDefaultFS, getAppForExtension, type FSNode } from './fileSystem';
+import { initDefaultFS, getAppForExtension, moveNodes, type FSNode } from './fileSystem';
 
 interface WindowState {
   id: string;
@@ -74,6 +74,8 @@ export default function Home() {
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const desktopRef = useRef<HTMLDivElement>(null);
+  const [iconDragInfo, setIconDragInfo] = useState<IconDragInfo | null>(null);
+  const explorerRefs = useRef<Map<string, { el: HTMLElement; folderId: string }>>(new Map());
 
   const topZIndex = useCallback(() => {
     return ++zCounter;
@@ -241,7 +243,19 @@ export default function Home() {
     }
   }, [drag]);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (iconDragInfo) {
+      const els = document.elementsFromPoint(e.clientX, e.clientY);
+      const dropEl = els.find(el => el.getAttribute('data-drop-folder'));
+      if (dropEl) {
+        const targetFolder = dropEl.getAttribute('data-drop-folder')!;
+        if (targetFolder !== iconDragInfo.sourceFolder) {
+          moveNodes(iconDragInfo.ids, targetFolder);
+          refreshDesktop();
+        }
+      }
+      setIconDragInfo(null);
+    }
     if (drag?.kind === 'move' && snapPreview) {
       setWindows(prev => prev.map(w => w.id === drag.id ? {
         ...w,
@@ -253,7 +267,7 @@ export default function Home() {
     }
     setDrag(null);
     setSnapPreview(null);
-  }, [drag, snapPreview]);
+  }, [drag, snapPreview, iconDragInfo, refreshDesktop]);
 
 
   return (
@@ -284,7 +298,7 @@ export default function Home() {
 
         {/* Desktop Icons — FileExplorer desktop mode */}
         <div className="absolute inset-0">
-          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} />
+          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} />
         </div>
 
         {/* Windows */}

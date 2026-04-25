@@ -204,11 +204,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         if (next.has(id)) next.delete(id); else next.add(id);
         return next;
       });
-    } else {
+    } else if (!selectedIds.has(id)) {
       setSelectedIds(new Set([id]));
     }
     setIconDrag({ id, startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY, active: false });
-  }, [isDesktop]);
+  }, [isDesktop, selectedIds]);
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
     if (!isDesktop) return;
@@ -276,15 +276,41 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   const handleDesktopPointerUp = useCallback(() => {
     if (iconDrag?.active && dropTarget) {
+      const dragOrigin = iconPositions[iconDrag.id];
+      if (!dragOrigin) { setIconDrag(null); setDropTarget(null); setSelBox(null); return; }
+
+      const dc = dropTarget.col - dragOrigin.col;
+      const dr = dropTarget.row - dragOrigin.row;
+      const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+        ? [...selectedIds]
+        : [iconDrag.id];
+
       setIconPositions(prev => {
         const next = { ...prev };
-        const targetKey = Object.keys(next).find(
-          k => next[k].col === dropTarget.col && next[k].row === dropTarget.row
-        );
-        if (targetKey && targetKey !== iconDrag.id) {
-          next[targetKey] = { ...prev[iconDrag.id] };
+        const newPositions: Record<string, { col: number; row: number }> = {};
+        for (const id of movedIds) {
+          const old = prev[id];
+          if (!old) continue;
+          const nc = Math.max(0, Math.min(gridSize.cols - 1, old.col + dc));
+          const nr = Math.max(0, Math.min(gridSize.rows - 1, old.row + dr));
+          newPositions[id] = { col: nc, row: nr };
         }
-        next[iconDrag.id] = { col: dropTarget.col, row: dropTarget.row };
+
+        const movedSet = new Set(movedIds);
+        const occupiedByMoved = new Set(Object.values(newPositions).map(p => `${p.col},${p.row}`));
+        for (const [id, pos] of Object.entries(newPositions)) {
+          const conflictKey = Object.keys(next).find(
+            k => !movedSet.has(k) && next[k].col === pos.col && next[k].row === pos.row
+          );
+          if (conflictKey) {
+            const origPos = prev[id];
+            if (origPos && !occupiedByMoved.has(`${origPos.col},${origPos.row}`)) {
+              next[conflictKey] = { ...origPos };
+            }
+          }
+          next[id] = pos;
+        }
+
         saveIconPositions(next);
         return next;
       });
@@ -292,7 +318,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setIconDrag(null);
     setDropTarget(null);
     setSelBox(null);
-  }, [iconDrag, dropTarget]);
+  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize]);
 
   const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: '__trash__', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
@@ -415,7 +441,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             {items.map(node => {
               const pos = iconPositions[node.id];
               if (!pos) return null;
-              const isDragging = iconDrag?.active && iconDrag.id === node.id;
+              const isDragging = iconDrag?.active && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has(node.id)));
               const isSelected = selectedIds.has(node.id);
               return (
                 <button
@@ -456,7 +482,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             {(() => {
               const pos = iconPositions['__trash__'];
               if (!pos) return null;
-              const isDragging = iconDrag?.active && iconDrag.id === '__trash__';
+              const isDragging = iconDrag?.active && (iconDrag.id === '__trash__' || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has('__trash__')));
               const isSelected = selectedIds.has('__trash__');
               return (
                 <button
@@ -488,31 +514,46 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 </button>
               );
             })()}
-            {/* Ghost icon during drag */}
+            {/* Ghost icons during drag */}
             {iconDrag?.active && (() => {
-              const dragNode = items.find(n => n.id === iconDrag.id);
-              const icon = dragNode ? getIconForNode(dragNode) : iconDrag.id === '__trash__' ? '🗑️' : '📎';
-              const label = dragNode?.name ?? (iconDrag.id === '__trash__' ? '휴지통' : '');
               const rect = contentRef.current?.getBoundingClientRect();
               if (!rect) return null;
-              return (
-                <div
-                  className="fixed flex flex-col items-center justify-center pointer-events-none"
-                  style={{
-                    left: iconDrag.curX - CELL_W / 2,
-                    top: iconDrag.curY - CELL_H / 2,
-                    width: CELL_W,
-                    height: CELL_H,
-                    opacity: 0.7,
-                    zIndex: 10001,
-                  }}
-                >
-                  <span className="text-3xl">{icon}</span>
-                  <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                    {label}
-                  </span>
-                </div>
-              );
+              const originPos = iconPositions[iconDrag.id];
+              if (!originPos) return null;
+              const originPxX = rect.left + originPos.col * CELL_W + CELL_W / 2;
+              const originPxY = rect.top + originPos.row * CELL_H + CELL_H / 2;
+              const offsetX = iconDrag.curX - originPxX;
+              const offsetY = iconDrag.curY - originPxY;
+
+              const ghostIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+                ? [...selectedIds] : [iconDrag.id];
+
+              return ghostIds.map(gid => {
+                const gpos = iconPositions[gid];
+                if (!gpos) return null;
+                const gNode = items.find(n => n.id === gid);
+                const gIcon = gNode ? getIconForNode(gNode) : gid === '__trash__' ? '🗑️' : '📎';
+                const gLabel = gNode?.name ?? (gid === '__trash__' ? '휴지통' : '');
+                return (
+                  <div
+                    key={`ghost-${gid}`}
+                    className="fixed flex flex-col items-center justify-center pointer-events-none"
+                    style={{
+                      left: rect.left + gpos.col * CELL_W + offsetX,
+                      top: rect.top + gpos.row * CELL_H + offsetY,
+                      width: CELL_W,
+                      height: CELL_H,
+                      opacity: 0.7,
+                      zIndex: 10001,
+                    }}
+                  >
+                    <span className="text-3xl">{gIcon}</span>
+                    <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      {gLabel}
+                    </span>
+                  </div>
+                );
+              });
             })()}
             {/* Selection box (rubber band) */}
             {selBox?.active && (

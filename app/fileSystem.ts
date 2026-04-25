@@ -165,10 +165,23 @@ export function moveNodes(ids: string[], targetParentId: string): { moved: strin
     return max;
   };
 
+  const isDescendant = (ancestorId: string, nodeId: string): boolean => {
+    let cur = nodeId;
+    while (cur && !ROOT_IDS.has(cur)) {
+      if (cur === ancestorId) return true;
+      const n = map.get(cur);
+      if (!n) break;
+      cur = n.parentId;
+    }
+    return false;
+  };
+
   const now = Date.now();
   for (const id of ids) {
     const node = map.get(id);
     if (!node) { blocked.push(id); continue; }
+    if (id === targetParentId) { blocked.push(id); continue; }
+    if (isDescendant(id, targetParentId)) { blocked.push(id); continue; }
     if (node.type === 'app' && isTrash) { blocked.push(id); continue; }
     if (!isTrash && targetDepth + 1 + getSubtreeDepth(id) > MAX_DEPTH) { blocked.push(id); continue; }
     node.parentId = targetParentId;

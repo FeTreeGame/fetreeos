@@ -8,6 +8,8 @@ const CELL_H = 90;
 const ICON_POS_KEY = 'fetree-icon-positions';
 
 type IconPositions = Record<string, { col: number; row: number }>;
+const TYPE_ORDER: Record<string, number> = { app: 0, folder: 1, file: 2 };
+const TRASH_NODE: FSNode = { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
 
 function loadIconPositions(): IconPositions {
   if (typeof window === 'undefined') return {};
@@ -350,7 +352,6 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     sortAndPlace((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
   }, [sortAndPlace]);
 
-  const TYPE_ORDER: Record<string, number> = { app: 0, folder: 1, file: 2 };
   const sortByType = useCallback(() => {
     sortAndPlace((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
   }, [sortAndPlace]);
@@ -360,22 +361,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [sortAndPlace]);
 
   const tidyGrid = useCallback(() => {
-    const allItems = [...items.map(n => n.id), '__trash__'];
-    const next: IconPositions = {};
-    let idx = 0;
-    for (let c = 0; c < gridSize.cols; c++) {
-      for (let r = 0; r < gridSize.rows; r++) {
-        if (idx >= allItems.length) break;
-        next[allItems[idx]] = { col: c, row: r };
-        idx++;
-      }
-    }
-    setIconPositions(next);
-    saveIconPositions(next);
-    setContextMenu(null);
-  }, [items, gridSize]);
+    sortAndPlace(() => 0);
+  }, [sortAndPlace]);
 
-  const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : items.length >= 0 ? currentFolder : currentFolder;
+  const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : currentFolder;
 
   return (
     <div className={`flex flex-col h-full ${isDesktop ? 'bg-transparent' : 'bg-zinc-900'}`} onClick={() => setContextMenu(null)}>
@@ -447,9 +436,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 }}
               />
             )}
-            {items.map(node => {
+            {[...items, TRASH_NODE].map(node => {
               const pos = iconPositions[node.id];
               if (!pos) return null;
+              const isTrash = node.id === '__trash__';
               const isDragging = iconDrag?.active && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has(node.id)));
               const isSelected = selectedIds.has(node.id);
               return (
@@ -465,11 +455,18 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     opacity: isDragging ? 0.3 : 1,
                   }}
                   onPointerDown={(e) => handleIconPointerDown(node.id, e)}
-                  onDoubleClick={() => { if (!iconDrag?.active) handleDoubleClick(node); }}
-                  onContextMenu={(e) => handleContextMenu(e, node)}
+                  onDoubleClick={() => {
+                    if (iconDrag?.active) return;
+                    if (isTrash) { onOpenFile?.(TRASH_NODE); return; }
+                    handleDoubleClick(node);
+                  }}
+                  onContextMenu={(e) => {
+                    if (isTrash) { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, node: TRASH_NODE }); return; }
+                    handleContextMenu(e, node);
+                  }}
                 >
                   <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : 'group-hover:bg-blue-500/10'}`} />
-                  <span className="text-3xl relative">{getIconForNode(node)}</span>
+                  <span className="text-3xl relative">{isTrash ? '🗑️' : getIconForNode(node)}</span>
                   {renaming === node.id ? (
                     <input
                       value={renameValue}
@@ -487,42 +484,6 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 </button>
               );
             })}
-            {/* Trash */}
-            {(() => {
-              const pos = iconPositions['__trash__'];
-              if (!pos) return null;
-              const isDragging = iconDrag?.active && (iconDrag.id === '__trash__' || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has('__trash__')));
-              const isSelected = selectedIds.has('__trash__');
-              return (
-                <button
-                  className="absolute flex flex-col items-center justify-center rounded group"
-                  style={{
-                    left: pos.col * CELL_W,
-                    top: pos.row * CELL_H,
-                    width: CELL_W,
-                    height: CELL_H,
-                    padding: 6,
-                    opacity: isDragging ? 0.3 : 1,
-                  }}
-                  onPointerDown={(e) => handleIconPointerDown('__trash__', e)}
-                  onDoubleClick={() => { if (iconDrag?.active) return;
-                    const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
-                    onOpenFile?.(trashNode);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setContextMenu({ x: e.clientX, y: e.clientY, node: { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' } as FSNode });
-                  }}
-                >
-                  <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : 'group-hover:bg-blue-500/10'}`} />
-                  <span className="text-3xl relative">🗑️</span>
-                  <span className="relative text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                    휴지통
-                  </span>
-                </button>
-              );
-            })()}
             {/* Ghost icons during drag */}
             {iconDrag?.active && (() => {
               const rect = contentRef.current?.getBoundingClientRect();
@@ -540,9 +501,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               return ghostIds.map(gid => {
                 const gpos = iconPositions[gid];
                 if (!gpos) return null;
-                const gNode = items.find(n => n.id === gid);
-                const gIcon = gNode ? getIconForNode(gNode) : gid === '__trash__' ? '🗑️' : '📎';
-                const gLabel = gNode?.name ?? (gid === '__trash__' ? '휴지통' : '');
+                const gNode = gid === '__trash__' ? TRASH_NODE : items.find(n => n.id === gid);
+                if (!gNode) return null;
+                const gIcon = gid === '__trash__' ? '🗑️' : getIconForNode(gNode);
+                const gLabel = gNode.name;
                 return (
                   <div
                     key={`ghost-${gid}`}
@@ -627,8 +589,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           {contextMenu.node ? (
             contextMenu.node.id === '__trash__' ? (<>
               <button onClick={() => {
-                const trashNode: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
-                onOpenFile?.(trashNode);
+                onOpenFile?.(TRASH_NODE);
                 setContextMenu(null);
               }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
               <div className="border-t border-white/10 my-0.5" />

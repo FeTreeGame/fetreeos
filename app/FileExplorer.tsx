@@ -76,6 +76,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const contentRef = useRef<HTMLDivElement>(null);
   const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
   const [iconPositions, setIconPositions] = useState<IconPositions>({});
+  const [showGrid, setShowGrid] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('fetree-show-grid') !== 'false';
+  });
 
   const [iconDrag, setIconDrag] = useState<{
     id: string;
@@ -104,7 +108,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [currentFolder, onFSChange]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  useEffect(() => { if (refreshKey !== undefined) setItems(getChildren(currentFolder)); }, [refreshKey, currentFolder]);
+  useEffect(() => {
+    if (refreshKey !== undefined) {
+      setItems(getChildren(currentFolder));
+      if (isDesktop) setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
+    }
+  }, [refreshKey, currentFolder, isDesktop]);
 
   useEffect(() => {
     if (!isDesktop || !contentRef.current) return;
@@ -407,7 +416,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         ) : isDesktop ? (
           <div className="relative w-full h-full">
             {/* Grid debug overlay */}
-            {Array.from({ length: gridSize.cols * gridSize.rows }, (_, i) => {
+            {showGrid && Array.from({ length: gridSize.cols * gridSize.rows }, (_, i) => {
               const col = i % gridSize.cols;
               const row = Math.floor(i / gridSize.cols);
               return (

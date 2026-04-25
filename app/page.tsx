@@ -5,6 +5,7 @@ import { APPS, type AppDef } from './apps';
 import Clock from './Clock';
 import Notepad from './Notepad';
 import FileExplorer from './FileExplorer';
+import Settings from './Settings';
 import { initDefaultFS, getAppForExtension, type FSNode } from './fileSystem';
 
 const GAMES_DATA: Record<string, { title: string; embedUrl: string }> = {
@@ -454,6 +455,9 @@ export default function Home() {
                 )}
                 {win.app.type === 'explorer' && (
                   <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openNode} onFSChange={refreshDesktop} />
+                )}
+                {win.app.type === 'settings' && (
+                  <Settings onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'iframe' && win.app.url && (
                   <iframe

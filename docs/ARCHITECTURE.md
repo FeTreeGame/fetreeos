@@ -60,7 +60,7 @@ interface AppDef {
   id: string;
   title: string;
   icon: string;
-  type: 'browser' | 'notepad' | 'iframe' | 'explorer' | 'empty';
+  type: 'browser' | 'notepad' | 'iframe' | 'explorer' | 'settings' | 'empty';
   defaultW?: number;
   defaultH?: number;
   url?: string;
@@ -71,6 +71,7 @@ interface AppDef {
 - `browser`: 주소창 + 게임 목록/상세 + iframe 임베드
 - `notepad`: 파일 기반 편집기 — FSNode 연동, File > New/Open/Save
 - `iframe`: 외부 배포 프로젝트를 전체 크기 iframe으로 임베드 (비활성 시 pointerEvents 차단)
+- `settings`: 제어판 — 아이콘 위치 초기화, 그리드 토글, 전체 데이터 초기화
 - `empty`: 플레이스홀더 (미구현 앱)
 
 ## 컴포넌트 구조
@@ -81,6 +82,7 @@ interface AppDef {
   - `refreshKey` prop으로 외부 FS 변경 감지 (Notepad 등에서 파일 생성 시 바탕화면 갱신)
 - `Clock.tsx` — 시계 + 캘린더 팝업
 - `Notepad.tsx` — ���일 기반 텍스트 편집기
+- `Settings.tsx` — 제어판 (그리드 토글 → FileExplorer 연동, initDefaultFS 재초기화)
 - `ContextMenu.tsx` — 범용 우클릭 메뉴 (화면 경계 바운딩)
 
 `page.tsx`는 윈도우 매니저(드래그/리사이즈/스냅/태스크바)에 집중, 파일 관련 로직은 FileExplorer로 위임.

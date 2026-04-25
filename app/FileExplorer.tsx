@@ -86,6 +86,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('fetree-auto-arrange') === 'true';
   });
+  const [explorerSort, setExplorerSort] = useState<'name' | 'type' | 'date' | null>(null);
 
   const [iconDrag, setIconDrag] = useState<{
     id: string;
@@ -660,7 +661,14 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-1">
-            {items.map(node => (
+            {(() => {
+              if (!explorerSort) return items;
+              const sorted = [...items];
+              if (explorerSort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+              else if (explorerSort === 'type') sorted.sort((a, b) => (TYPE_ORDER[a.type] ?? 2) - (TYPE_ORDER[b.type] ?? 2) || a.name.localeCompare(b.name));
+              else if (explorerSort === 'date') sorted.sort((a, b) => a.createdAt - b.createdAt);
+              return sorted;
+            })().map(node => (
               <button
                 key={node.id}
                 className="flex flex-col items-center p-2 rounded hover:bg-white/10 transition-colors"
@@ -721,8 +729,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           ) : (<>
             <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 텍스트 파일</button>
             <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 폴더</button>
-            {isDesktop && (<>
-              <div className="border-t border-white/10 my-0.5" />
+            <div className="border-t border-white/10 my-0.5" />
+            {isDesktop ? (<>
               <button onClick={sortByName} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름순 정렬</button>
               <button onClick={sortByType} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">유형순 정렬</button>
               <button onClick={sortByDate} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">날짜순 정렬</button>
@@ -736,6 +744,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 {autoArrange ? '✓ ' : '   '}자동 정렬
               </button>
               <button onClick={tidyGrid} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">그리드에 맞춤</button>
+            </>) : (<>
+              <button onClick={() => { setExplorerSort(explorerSort === 'name' ? null : 'name'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                {explorerSort === 'name' ? '✓ ' : '   '}이름순 정렬
+              </button>
+              <button onClick={() => { setExplorerSort(explorerSort === 'type' ? null : 'type'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                {explorerSort === 'type' ? '✓ ' : '   '}유형순 정렬
+              </button>
+              <button onClick={() => { setExplorerSort(explorerSort === 'date' ? null : 'date'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                {explorerSort === 'date' ? '✓ ' : '   '}날짜순 정렬
+              </button>
             </>)}
           </>)}
         </div>

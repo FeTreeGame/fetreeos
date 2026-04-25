@@ -265,11 +265,30 @@ export function initDefaultFS(): void {
   }
 
   if (!nodes.some(n => n.type === 'folder' && n.name === '내 문서')) {
+    const docsId = `folder-docs-${Date.now()}`;
     nodes.push({
-      id: `folder-docs-${Date.now()}`,
+      id: docsId,
       name: '내 문서',
       type: 'folder',
       parentId: 'desktop',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    nodes.push({
+      id: `file-memo-${Date.now()}`,
+      name: '메모.txt',
+      type: 'file',
+      parentId: docsId,
+      extension: '.txt',
+      content: '내 문서 폴더의 샘플 메모입니다.',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    nodes.push({
+      id: `folder-projects-${Date.now()}`,
+      name: '프로젝트',
+      type: 'folder',
+      parentId: docsId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

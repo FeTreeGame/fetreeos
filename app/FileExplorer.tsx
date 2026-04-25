@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getChildren, getIconForNode, createFile, createFolder, moveToTrash, emptyTrash, updateNode, type FSNode } from './fileSystem';
+import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNodes, emptyTrash, updateNode, type FSNode } from './fileSystem';
 
 const CELL_W = 90;
 const CELL_H = 90;
@@ -200,13 +200,13 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [currentFolder, refresh]);
 
   const handleNewFolder = useCallback(() => {
-    createFolder(currentFolder, '새 폴더');
+    if (!createFolder(currentFolder, '새 폴더')) return;
     setContextMenu(null);
     refresh();
   }, [currentFolder, refresh]);
 
   const handleDelete = useCallback((id: string) => {
-    moveToTrash(id);
+    moveNodes([id], 'trash');
     setContextMenu(null);
     refresh();
   }, [refresh]);
@@ -320,16 +320,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         : [iconDrag.id];
 
       if (targetNodeId && dropTarget.center) {
-        if (targetNodeId === 'trash') {
-          for (const id of movedIds) moveToTrash(id);
-          setSelectedIds(new Set());
-          setIconDrag(null); setDropTarget(null); setSelBox(null);
-          refresh();
-          return;
-        }
-        const targetNode = items.find(n => n.id === targetNodeId);
-        if (targetNode?.type === 'folder') {
-          for (const id of movedIds) updateNode(id, { parentId: targetNodeId });
+        const targetNode = targetNodeId === 'trash' ? TRASH_NODE : items.find(n => n.id === targetNodeId);
+        if (targetNodeId === 'trash' || targetNode?.type === 'folder') {
+          moveNodes(movedIds, targetNodeId);
           setSelectedIds(new Set());
           setIconDrag(null); setDropTarget(null); setSelBox(null);
           refresh();
@@ -435,7 +428,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     sortAndPlace(() => 0);
   }, [sortAndPlace]);
 
-  const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : currentFolder;
+  const breadcrumb = getPath(currentFolder);
 
   return (
     <div className={`flex flex-col h-full ${isDesktop ? 'bg-transparent' : 'bg-zinc-900'}`} onClick={() => setContextMenu(null)}>
@@ -453,11 +446,22 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center disabled:opacity-30"
           >→</button>
           <button
-            onClick={() => currentFolder !== 'desktop' && currentFolder !== 'root' ? goBack() : null}
-            className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center"
+            onClick={() => {
+              if (breadcrumb.length > 1) navigateTo(breadcrumb[breadcrumb.length - 2].id);
+            }}
+            disabled={breadcrumb.length <= 1}
+            className="w-6 h-6 rounded text-xs text-zinc-400 hover:bg-zinc-700 flex items-center justify-center disabled:opacity-30"
           >↑</button>
-          <div className="flex-1 h-6 px-2 mx-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-zinc-400 flex items-center">
-            {pathLabel}
+          <div className="flex-1 h-6 px-2 mx-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-zinc-400 flex items-center overflow-hidden">
+            {breadcrumb.map((seg, i) => (
+              <span key={seg.id} className="flex items-center shrink-0">
+                {i > 0 && <span className="mx-1 text-zinc-600">/</span>}
+                <button
+                  onClick={() => navigateTo(seg.id)}
+                  className="hover:text-white/80 transition-colors truncate"
+                >{seg.name}</button>
+              </span>
+            ))}
           </div>
         </div>
       )}

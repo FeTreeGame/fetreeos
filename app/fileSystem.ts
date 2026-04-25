@@ -2,7 +2,8 @@ import { APPS } from './apps';
 
 const STORAGE_KEY = 'fetree-fs';
 const FS_VERSION_KEY = 'fetree-fs-version';
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
+export const MAX_DEPTH = 4;
 
 export interface FSNode {
   id: string;
@@ -63,6 +64,41 @@ export function getNode(id: string): FSNode | null {
   return loadFS().find(n => n.id === id) ?? null;
 }
 
+const ROOT_IDS = new Set(['desktop', 'trash', 'root']);
+
+export function getPath(nodeId: string): { id: string; name: string }[] {
+  const nodes = loadFS();
+  const map = new Map(nodes.map(n => [n.id, n]));
+  const path: { id: string; name: string }[] = [];
+  let current = nodeId;
+  while (current && !ROOT_IDS.has(current)) {
+    const node = map.get(current);
+    if (!node) break;
+    path.unshift({ id: node.id, name: node.name });
+    current = node.parentId;
+  }
+  if (ROOT_IDS.has(current ?? nodeId)) {
+    const labels: Record<string, string> = { desktop: 'Desktop', trash: '휴지통', root: '/' };
+    path.unshift({ id: current ?? nodeId, name: labels[current ?? nodeId] ?? current ?? nodeId });
+  }
+  return path;
+}
+
+export function getDepth(parentId: string): number {
+  if (ROOT_IDS.has(parentId)) return 0;
+  const nodes = loadFS();
+  const map = new Map(nodes.map(n => [n.id, n]));
+  let depth = 0;
+  let current = parentId;
+  while (current && !ROOT_IDS.has(current)) {
+    depth++;
+    const node = map.get(current);
+    if (!node) break;
+    current = node.parentId;
+  }
+  return depth;
+}
+
 export function createFile(parentId: string, name: string, content = ''): FSNode {
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : undefined;
   const node: FSNode = {
@@ -81,7 +117,8 @@ export function createFile(parentId: string, name: string, content = ''): FSNode
   return node;
 }
 
-export function createFolder(parentId: string, name: string): FSNode {
+export function createFolder(parentId: string, name: string): FSNode | null {
+  if (getDepth(parentId) >= MAX_DEPTH) return null;
   const node: FSNode = {
     id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     name,
@@ -112,24 +149,43 @@ export function updateNode(id: string, updates: Partial<Pick<FSNode, 'name' | 'c
   saveFS(nodes);
 }
 
-export function moveToTrash(id: string): void {
+export function moveNodes(ids: string[], targetParentId: string): { moved: string[]; blocked: string[] } {
   const nodes = loadFS();
-  const node = nodes.find(n => n.id === id);
-  if (node?.type === 'app') return;
-  const moveRecursive = (targetId: string) => {
-    const idx = nodes.findIndex(n => n.id === targetId);
-    if (idx >= 0 && nodes[idx].parentId !== 'trash') {
-      nodes[idx].parentId = 'trash';
-      nodes[idx].updatedAt = Date.now();
+  const map = new Map(nodes.map(n => [n.id, n]));
+  const moved: string[] = [];
+  const blocked: string[] = [];
+  const isTrash = targetParentId === 'trash';
+  const targetDepth = isTrash ? 0 : getDepth(targetParentId);
+
+  const getSubtreeDepth = (nodeId: string): number => {
+    let max = 0;
+    for (const n of nodes) {
+      if (n.parentId === nodeId) max = Math.max(max, 1 + getSubtreeDepth(n.id));
     }
-    nodes.filter(n => n.parentId === targetId).forEach(n => moveRecursive(n.id));
+    return max;
   };
-  moveRecursive(id);
+
+  const now = Date.now();
+  for (const id of ids) {
+    const node = map.get(id);
+    if (!node) { blocked.push(id); continue; }
+    if (node.type === 'app' && isTrash) { blocked.push(id); continue; }
+    if (!isTrash && targetDepth + 1 + getSubtreeDepth(id) > MAX_DEPTH) { blocked.push(id); continue; }
+    node.parentId = targetParentId;
+    node.updatedAt = now;
+    moved.push(id);
+  }
+
   saveFS(nodes);
+  return { moved, blocked };
+}
+
+export function moveToTrash(id: string): void {
+  moveNodes([id], 'trash');
 }
 
 export function restoreFromTrash(id: string, targetParent = 'desktop'): void {
-  updateNode(id, { parentId: targetParent });
+  moveNodes([id], targetParent);
 }
 
 export function deleteNode(id: string): void {
@@ -175,7 +231,12 @@ export function initDefaultFS(): void {
   const existingAppIds = new Set(nodes.filter(n => n.type === 'app').map(n => n.appId));
 
   for (const app of APPS) {
-    if (existingAppIds.has(app.id)) continue;
+    const existing = nodes.find(n => n.type === 'app' && n.appId === app.id);
+    if (existing) {
+      existing.name = app.title;
+      existing.icon = app.icon;
+      continue;
+    }
     const node: FSNode = {
       id: `app-${app.id}`,
       name: app.title,

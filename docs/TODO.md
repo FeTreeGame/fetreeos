@@ -51,10 +51,24 @@
 
 ## 다음 마일스톤 — 폴더 시스템 본격화
 
+### 설계
+
+- MAX_DEPTH = 4 (desktop 아래 4단계). 안정성+실용성 기준, 향후 조정 가능
+- getPath(nodeId) — parentId 체인 순회로 경로 계산 (depth 제한으로 상수 비용)
+- moveNodes(ids, targetParentId) — 모든 이동을 통합 (바탕화면↔폴더↔휴지통 = parentId 변경)
+  - 앱 보호, 재귀 이동(trash), depth 초과 차단 포함
+  - 반환값으로 moved/blocked 분리 → UI 피드백
+
+### 작업
+
+- [x] getPath + getDepth + MAX_DEPTH 도입 (fileSystem.ts)
+- [x] moveNodes 통합 이동 함수 — moveToTrash/updateNode/restoreFromTrash 호출부 교체
+- [x] createFolder depth 체크 (MAX_DEPTH 초과 시 생성 차단)
+- [x] 탐색기 주소 표시줄 breadcrumb 경로 표시 (getPath 연동, 세그먼트 클릭 이동)
+- [x] Files → File Explorer 명칭 변경 + FS 버전 3 (앱 노드 이름/아이콘 자동 동기화)
 - [ ] 폴더 내부 정렬 기능 (바탕화면과 동일한 정렬 옵션)
-- [ ] 경로(path) 개념 도입 — 주소 표시줄 경로 탐색, 폴더 계층 표현
-- [ ] 탐색기 ↔ 바탕화면 간 드래그 드롭 파일 이동
 - [ ] 휴지통 탐색기 — 복원/완전삭제 UI
+- [ ] 탐색기 ↔ 바탕화면 간 드래그 드롭 파일 이동
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
 
 ## 앱 로드맵

@@ -11,7 +11,7 @@ export interface AppDef {
 
 export const APPS: AppDef[] = [
   // --- 기본 앱 ---
-  { id: 'explorer', title: 'Files', icon: '📂', type: 'explorer' },
+  { id: 'explorer', title: 'File Explorer', icon: '📂', type: 'explorer' },
   { id: 'browser', title: 'Internet', icon: '🌐', type: 'browser' },
   { id: 'notepad', title: 'Notes', icon: '📝', type: 'notepad' },
   { id: 'settings', title: 'Settings', icon: '⚙️', type: 'settings' },

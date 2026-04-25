@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNodes, emptyTrash, updateNode, type FSNode } from './fileSystem';
+import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNodes, emptyTrash, deleteNode, updateNode, type FSNode } from './fileSystem';
 
 const CELL_W = 90;
 const CELL_H = 90;
@@ -710,7 +710,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {contextMenu.node ? (
+          {!contextMenu.node && currentFolder === 'trash' ? (<>
+            <button onClick={() => { emptyTrash(); refresh(); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">휴지통 비우기</button>
+          </>) : contextMenu.node ? (
             contextMenu.node.id === 'trash' ? (<>
               <button onClick={() => {
                 onOpenFile?.(TRASH_NODE);
@@ -718,6 +720,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
               <div className="border-t border-white/10 my-0.5" />
               <button onClick={() => { emptyTrash(); refresh(); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">휴지통 비우기</button>
+            </>) : currentFolder === 'trash' ? (<>
+              <button onClick={() => { moveNodes([contextMenu.node!.id], 'desktop'); setContextMenu(null); refresh(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">복원</button>
+              <div className="border-t border-white/10 my-0.5" />
+              <button onClick={() => { deleteNode(contextMenu.node!.id); setContextMenu(null); refresh(); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">완전 삭제</button>
             </>) : (<>
               <button onClick={() => handleDoubleClick(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
               {contextMenu.node.type !== 'app' && (<>

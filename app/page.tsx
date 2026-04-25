@@ -206,6 +206,9 @@ export default function Home() {
   }, [focusWindow]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (iconDragInfo) {
+      setIconDragInfo(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY } : null);
+    }
     if (!drag) return;
     const desktop = desktopRef.current;
     if (!desktop) return;
@@ -241,7 +244,7 @@ export default function Home() {
         return next;
       }));
     }
-  }, [drag]);
+  }, [drag, iconDragInfo]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
@@ -251,8 +254,9 @@ export default function Home() {
       for (const el of allDropTargets) {
         const rect = el.getBoundingClientRect();
         if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          const z = parseInt(getComputedStyle(el.closest('[id^="win-"]') || el).zIndex || '0', 10);
-          if (z > topZ) {
+          const winEl = el.closest('[id^="win-"]');
+          const z = winEl ? parseInt(getComputedStyle(winEl).zIndex || '0', 10) : 0;
+          if (z >= topZ) {
             topZ = z;
             targetFolder = el.getAttribute('data-drop-folder');
           }
@@ -405,7 +409,7 @@ export default function Home() {
                   <Notepad fileId={win.fileId} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'explorer' && (
-                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} />
+                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} />
                 )}
                 {win.app.type === 'settings' && (
                   <Settings onFSChange={refreshDesktop} />
@@ -438,6 +442,26 @@ export default function Home() {
             </div>
           );
         })}
+
+        {/* Cross-drag ghost */}
+        {iconDragInfo && (
+          <div
+            className="fixed flex flex-col items-center justify-center pointer-events-none"
+            style={{
+              left: iconDragInfo.curX - 45,
+              top: iconDragInfo.curY - 45,
+              width: 90,
+              height: 90,
+              opacity: 0.7,
+              zIndex: 10001,
+            }}
+          >
+            <span className="text-3xl">{iconDragInfo.icon}</span>
+            <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              {iconDragInfo.name}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Taskbar */}

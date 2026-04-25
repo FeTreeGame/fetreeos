@@ -69,7 +69,7 @@
 - [x] 휴지통 탐색기 — 복원/완전삭제 UI (우클릭 메뉴 분기, 배경 메뉴 비우기)
 - [x] 정렬 상태 저장 (desktopSort localStorage 저장, 새로고침 후 유지)
 - [x] 컨텍스트 메뉴 서브메뉴 (새로 만들기 ▶, 정렬 기준 ▶ — 호버 펼침)
-- [x] 바탕화면 → 탐색기 드래그 드롭 파일 이동 (pointerEvents 투과 + querySelectorAll rect 판정 + zIndex 최상위 선택)
+- [x] 바탕화면 ↔ 탐색기 크로스 드래그 드롭 (pointerEvents 투과 + rect 판정 + 고스트 아이콘)
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
 
 ### 크로스 드래그 드롭 — 설계 메모
@@ -80,7 +80,8 @@
 - 드래그 중 윈도우에 `pointerEvents: 'none'` → 바탕화면 pointer 이벤트 관통
 - page.tsx `handlePointerUp`에서 `querySelectorAll('[data-drop-folder]')` + rect 판정 + zIndex 최상위 선택
 - `refreshKey={fsRevision}`으로 탐색기 창도 즉시 갱신
-- 남은 방향: 탐색기 → 바탕화면, 탐색기 → 탐색기 (탐색기 아이콘에 드래그 추가 필요)
+- 양방향 완성 (바탕화면↔탐색기, 탐색기↔탐색기)
+- page.tsx handlePointerMove에서 고스트 좌표 갱신, 고스트 렌더링도 page.tsx에서 통합
 
 ## 앱 로드맵
 

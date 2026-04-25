@@ -60,6 +60,10 @@ function autoPlace(
 export interface IconDragInfo {
   ids: string[];
   sourceFolder: string;
+  icon: string;
+  name: string;
+  curX: number;
+  curY: number;
 }
 
 interface FileExplorerProps {
@@ -241,8 +245,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [renaming, renameValue, refresh]);
 
   const handleIconPointerDown = useCallback((id: string, e: React.PointerEvent) => {
-    if (!isDesktop) return;
     e.stopPropagation();
+    if (!isDesktop) {
+      setIconDrag({ id, startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY, active: false });
+      return;
+    }
     if (e.ctrlKey || e.metaKey) {
       setSelectedIds(prev => {
         const next = new Set(prev);
@@ -288,7 +295,15 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       if (!iconDrag.active) {
         const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
           ? [...selectedIds].filter(id => id !== 'trash') : [iconDrag.id];
-        onIconDragChange?.({ ids: movedIds, sourceFolder: currentFolder });
+        const node = iconDrag.id === 'trash' ? TRASH_NODE : items.find(n => n.id === iconDrag.id);
+        onIconDragChange?.({
+          ids: movedIds,
+          sourceFolder: currentFolder,
+          icon: node ? (iconDrag.id === 'trash' ? '🗑️' : getIconForNode(node)) : '📎',
+          name: node?.name ?? '',
+          curX: e.clientX,
+          curY: e.clientY,
+        });
       }
       setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
       setDropTarget({ col, row, center, afterY: relY >= 0.5 });
@@ -432,6 +447,32 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setSelBox(null);
   }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange, onIconDragChange]);
 
+  const handleExplorerPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!iconDrag) return;
+    const dx = e.clientX - iconDrag.startX;
+    const dy = e.clientY - iconDrag.startY;
+    if (!iconDrag.active && Math.sqrt(dx * dx + dy * dy) < 5) return;
+    if (!iconDrag.active) {
+      const node = items.find(n => n.id === iconDrag.id);
+      onIconDragChange?.({
+        ids: [iconDrag.id],
+        sourceFolder: currentFolder,
+        icon: node ? getIconForNode(node) : '📎',
+        name: node?.name ?? '',
+        curX: e.clientX,
+        curY: e.clientY,
+      });
+    }
+    setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
+  }, [iconDrag, currentFolder, onIconDragChange, items]);
+
+  const handleExplorerPointerUp = useCallback(() => {
+    if (iconDrag?.active) {
+      onIconDragChange?.(null);
+    }
+    setIconDrag(null);
+  }, [iconDrag, onIconDragChange]);
+
   const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
     allItems.sort(compareFn);
@@ -513,8 +554,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         className={`flex-1 overflow-auto ${isDesktop ? '' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
         onPointerDown={isDesktop ? handleBgPointerDown : undefined}
-        onPointerMove={isDesktop ? handleDesktopPointerMove : undefined}
-        onPointerUp={isDesktop ? (e) => handleDesktopPointerUp(e) : undefined}
+        onPointerMove={isDesktop ? handleDesktopPointerMove : handleExplorerPointerMove}
+        onPointerUp={isDesktop ? (e) => handleDesktopPointerUp(e) : handleExplorerPointerUp}
       >
         {items.length === 0 && !isDesktop ? (
           <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
@@ -712,6 +753,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               <button
                 key={node.id}
                 className="flex flex-col items-center p-2 rounded hover:bg-white/10 transition-colors"
+                onPointerDown={(e) => handleIconPointerDown(node.id, e)}
                 onDoubleClick={() => handleDoubleClick(node)}
                 onContextMenu={(e) => handleContextMenu(e, node)}
               >

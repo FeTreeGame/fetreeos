@@ -78,6 +78,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [history, setHistory] = useState<string[]>([initialFolderId]);
   const [historyIdx, setHistoryIdx] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node?: FSNode } | null>(null);
+  const [subMenu, setSubMenu] = useState<'create' | 'sort' | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -204,6 +205,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ x: e.clientX, y: e.clientY, node });
+    setSubMenu(null);
   }, []);
 
   const handleNewFile = useCallback(() => {
@@ -737,7 +739,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       {/* Context Menu */}
       {contextMenu && (
         <div
-          className="fixed rounded shadow-xl overflow-hidden"
+          className="fixed rounded shadow-xl"
           style={{
             left: contextMenu.x,
             top: contextMenu.y,
@@ -771,39 +773,64 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               </>)}
             </>)
           ) : (<>
-            <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 텍스트 파일</button>
-            <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 폴더</button>
+            <div className="relative" onMouseEnter={() => setSubMenu('create')} onMouseLeave={() => setSubMenu(null)}>
+              <button className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 flex justify-between items-center">
+                새로 만들기 <span className="text-[10px] text-white/40">▶</span>
+              </button>
+              {subMenu === 'create' && (
+                <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 120 }}>
+                  <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">텍스트 파일</button>
+                  <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">폴더</button>
+                </div>
+              )}
+            </div>
             <div className="border-t border-white/10 my-0.5" />
             {isDesktop ? (<>
               <button onClick={() => {
-                if (!autoArrange) {
-                  setAutoArrange(true);
-                  localStorage.setItem('fetree-auto-arrange', 'true');
-                } else {
-                  const cycle: ('type' | 'name' | 'date')[] = ['type', 'name', 'date'];
-                  const nextSort = cycle[(cycle.indexOf(desktopSort) + 1) % cycle.length];
-                  setDesktopSort(nextSort);
-                  localStorage.setItem('fetree-desktop-sort', nextSort);
-                }
+                const next = !autoArrange;
+                setAutoArrange(next);
+                localStorage.setItem('fetree-auto-arrange', String(next));
                 setContextMenu(null);
               }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                {autoArrange ? '✓ ' : '   '}자동 정렬 ({desktopSort === 'name' ? '이름순' : desktopSort === 'date' ? '날짜순' : '유형순'})
+                {autoArrange ? '✓ ' : '   '}자동 정렬
               </button>
-              <button onClick={() => {
-                setAutoArrange(false);
-                localStorage.setItem('fetree-auto-arrange', 'false');
-                setContextMenu(null);
-              }} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 ${autoArrange ? 'text-white/70' : 'text-white/30'}`}>정렬 해제</button>
+              <div className="relative" onMouseEnter={() => setSubMenu('sort')} onMouseLeave={() => setSubMenu(null)}>
+                <button className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 flex justify-between items-center">
+                  정렬 기준 <span className="text-[10px] text-white/40">▶</span>
+                </button>
+                {subMenu === 'sort' && (
+                  <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 100 }}>
+                    <button onClick={() => { setDesktopSort('name'); localStorage.setItem('fetree-desktop-sort', 'name'); sortByName(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {desktopSort === 'name' ? '✓ ' : '   '}이름순
+                    </button>
+                    <button onClick={() => { setDesktopSort('type'); localStorage.setItem('fetree-desktop-sort', 'type'); sortByType(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {desktopSort === 'type' ? '✓ ' : '   '}유형순
+                    </button>
+                    <button onClick={() => { setDesktopSort('date'); localStorage.setItem('fetree-desktop-sort', 'date'); sortByDate(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {desktopSort === 'date' ? '✓ ' : '   '}날짜순
+                    </button>
+                  </div>
+                )}
+              </div>
             </>) : (<>
-              <button onClick={() => { setExplorerSort(explorerSort === 'name' ? null : 'name'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                {explorerSort === 'name' ? '✓ ' : '   '}이름순 정렬
-              </button>
-              <button onClick={() => { setExplorerSort(explorerSort === 'type' ? null : 'type'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                {explorerSort === 'type' ? '✓ ' : '   '}유형순 정렬
-              </button>
-              <button onClick={() => { setExplorerSort(explorerSort === 'date' ? null : 'date'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                {explorerSort === 'date' ? '✓ ' : '   '}날짜순 정렬
-              </button>
+              <div className="relative" onMouseEnter={() => setSubMenu('sort')} onMouseLeave={() => setSubMenu(null)}>
+                <button className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 flex justify-between items-center">
+                  정렬 기준 <span className="text-[10px] text-white/40">▶</span>
+                </button>
+                {subMenu === 'sort' && (
+                  <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 100 }}>
+                    <button onClick={() => { setExplorerSort(explorerSort === 'name' ? null : 'name'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {explorerSort === 'name' ? '✓ ' : '   '}이름순
+                    </button>
+                    <button onClick={() => { setExplorerSort(explorerSort === 'type' ? null : 'type'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {explorerSort === 'type' ? '✓ ' : '   '}유형순
+                    </button>
+                    <button onClick={() => { setExplorerSort(explorerSort === 'date' ? null : 'date'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {explorerSort === 'date' ? '✓ ' : '   '}날짜순
+                    </button>
+                  </div>
+                )}
+              </div>
             </>)}
           </>)}
         </div>

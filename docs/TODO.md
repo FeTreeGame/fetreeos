@@ -35,7 +35,7 @@
 - [x] 아이콘 드래그 이동 (고스트 + 드롭 타겟 하이라이트 + 자리 교환)
 - [x] 선택 박스/러버밴드 (범위 선택 + Ctrl+클릭 토글)
 - [x] 정렬 옵션 (이름순/유형순/날짜순 + 그리드에 맞춤)
-- [x] 아이콘 선택 시각 개선 — hover/선택 시 파랑 오버레이��� 통일
+- [x] 아이콘 선택 시각 개선 — hover/선택 시 파랑 오버레이 통일
 - [x] Ctrl+선택 박스 XOR 토글 (기존 선택 유지 + 범위 내 선택/해제 전환)
 - [x] 다중선택 드래그 이동 (선택 그룹 전체 고스트 + 함께 이동)
 - [x] Settings 앱 (아이콘 위치 초기화, 그리드 토글, 전체 데이터 초기화 — 제어판)
@@ -66,10 +66,23 @@
 - [x] createFolder depth 체크 (MAX_DEPTH 초과 시 생성 차단)
 - [x] 탐색기 주소 표시줄 breadcrumb 경로 표시 (getPath 연동, 세그먼트 클릭 이동)
 - [x] Files → File Explorer 명칭 변경 + FS 버전 3 (앱 노드 이름/아이콘 자동 동기화)
-- [ ] 폴더 내부 정렬 기능 (바탕화면과 동일한 정렬 옵션)
 - [x] 휴지통 탐색기 — 복원/완전삭제 UI (우클릭 메뉴 분기, 배경 메뉴 비우기)
+- [x] 정렬 상태 저장 (desktopSort localStorage 저장, 새로고침 후 유지)
+- [x] 컨텍스트 메뉴 서브메뉴 (새로 만들기 ▶, 정렬 기준 ▶ — 호버 펼침)
 - [ ] 탐색기 ↔ 바탕화면 간 드래그 드롭 파일 이동
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
+
+### 크로스 드래그 드롭 — 설계 메모
+
+현재 인프라 구축 완료, 실제 동작은 미검증:
+- `data-drop-folder` 속성으로 각 FileExplorer 콘텐츠 영역 식별
+- `onIconDragChange` → page.tsx에 드래그 중인 ids/sourceFolder 전달
+- page.tsx `handlePointerUp`에서 `elementsFromPoint` + `moveNodes` 판정
+- 미해결: 바탕화면 pointer 이벤트가 탐색기 창에 가려져 끊기는 문제
+  - page.tsx 최상위 onPointerMove/Up은 버블링으로 항상 발동 확인
+  - 고스트 아이콘 위치 갱신이 끊기는 건 별도 해결 필요
+- daedalOS 참조: HTML5 DnD API 사용 (useDraggableEntries + useFileDrop)
+  - 우리는 pointer events 유지 — 러버밴드/세밀한 드롭 판정/모바일 호환성 우위
 
 ## 앱 로드맵
 

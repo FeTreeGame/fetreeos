@@ -76,7 +76,6 @@ export default function Home() {
   const desktopRef = useRef<HTMLDivElement>(null);
   const [iconDragInfo, setIconDragInfo] = useState<IconDragInfo | null>(null);
   const [crossDropTarget, setCrossDropTarget] = useState<string | null>(null);
-  const explorerRefs = useRef<Map<string, { el: HTMLElement; folderId: string }>>(new Map());
 
   const topZIndex = useCallback(() => {
     return ++zCounter;

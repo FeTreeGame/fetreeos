@@ -247,6 +247,20 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setRenaming(null);
   }, [renaming, renameValue, refresh]);
 
+  const clearDragState = useCallback(() => {
+    setIconDrag(null);
+    setDropTarget(null);
+    setSelBox(null);
+  }, []);
+
+  const getDragIds = useCallback((dragId: string, excludeTrash = false) => {
+    if (selectedIds.has(dragId) && selectedIds.size > 1) {
+      const ids = [...selectedIds];
+      return excludeTrash ? ids.filter(id => id !== 'trash') : ids;
+    }
+    return [dragId];
+  }, [selectedIds]);
+
   const handleIconPointerDown = useCallback((id: string, e: React.PointerEvent) => {
     e.stopPropagation();
     if (!isDesktop) {
@@ -276,7 +290,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       curX: e.clientX - rect.left, curY: e.clientY - rect.top,
       active: false, additive: isAdditive, baseSelection: new Set(isAdditive ? selectedIds : []),
     });
-  }, [isDesktop, selectedIds]);
+  }, [selectedIds]);
 
   const handleDesktopPointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDrag) {
@@ -295,8 +309,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const center = relX > 0.2 && relX < 0.8 && relY > 0.2 && relY < 0.8;
 
       if (!iconDrag.active) {
-        const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-          ? [...selectedIds].filter(id => id !== 'trash') : [iconDrag.id];
+        const movedIds = getDragIds(iconDrag.id, true);
         const ghosts = movedIds.map(id => {
           const n = id === 'trash' ? TRASH_NODE : items.find(nd => nd.id === id);
           return { icon: n ? (id === 'trash' ? '🗑️' : getIconForNode(n)) : '📎', name: n?.name ?? '' };
@@ -350,9 +363,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   const handleDesktopPointerUp = useCallback((e?: React.PointerEvent) => {
     if (iconDrag?.active && e) {
-      const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-        ? [...selectedIds].filter(id => id !== 'trash')
-        : [iconDrag.id];
+      const movedIds = getDragIds(iconDrag.id, true);
       const els = document.elementsFromPoint(iconDrag.curX, iconDrag.curY);
       const dropEl = els.find(el => el.getAttribute('data-drop-folder') && el !== contentRef.current);
       if (dropEl) {
@@ -360,28 +371,26 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         moveNodes(movedIds, targetFolder);
         setSelectedIds(new Set());
         onIconDragChange?.(null);
-        setIconDrag(null); setDropTarget(null); setSelBox(null);
+        clearDragState();
         refresh();
         return;
       }
     }
     if (iconDrag?.active && dropTarget) {
       const dragOrigin = iconPositions[iconDrag.id];
-      if (!dragOrigin) { setIconDrag(null); setDropTarget(null); setSelBox(null); return; }
+      if (!dragOrigin) { clearDragState(); return; }
 
       const targetNodeId = dropTarget.center
         ? Object.keys(iconPositions).find(id => id !== iconDrag.id && iconPositions[id].col === dropTarget.col && iconPositions[id].row === dropTarget.row)
         : undefined;
-      const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-        ? [...selectedIds].filter(id => id !== 'trash')
-        : [iconDrag.id];
+      const movedIds = getDragIds(iconDrag.id, true);
 
       if (targetNodeId && dropTarget.center) {
         const targetNode = targetNodeId === 'trash' ? TRASH_NODE : items.find(n => n.id === targetNodeId);
         if (targetNodeId === 'trash' || targetNode?.type === 'folder') {
           moveNodes(movedIds, targetNodeId);
           setSelectedIds(new Set());
-          setIconDrag(null); setDropTarget(null); setSelBox(null);
+          clearDragState();
           refresh();
           return;
         }
@@ -407,15 +416,13 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         }
         setIconPositions(next);
         saveIconPositions(next);
-        setIconDrag(null); setDropTarget(null); setSelBox(null);
+        clearDragState();
         return;
       }
 
       const dc = dropTarget.col - dragOrigin.col;
       const dr = dropTarget.row - dragOrigin.row;
-      const freeMovedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-        ? [...selectedIds]
-        : [iconDrag.id];
+      const freeMovedIds = getDragIds(iconDrag.id);
 
       setIconPositions(prev => {
         const next = { ...prev };
@@ -448,10 +455,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       });
     }
     onIconDragChange?.(null);
-    setIconDrag(null);
-    setDropTarget(null);
-    setSelBox(null);
-  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange, onIconDragChange]);
+    clearDragState();
+  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange, onIconDragChange, clearDragState, getDragIds]);
 
   const handleExplorerPointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDrag) {
@@ -459,8 +464,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const dy = e.clientY - iconDrag.startY;
       if (!iconDrag.active && Math.sqrt(dx * dx + dy * dy) < 5) return;
       if (!iconDrag.active) {
-        const dragIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-          ? [...selectedIds] : [iconDrag.id];
+        const dragIds = getDragIds(iconDrag.id);
         const ghosts = dragIds.map(id => {
           const n = items.find(nd => nd.id === id);
           return { icon: n ? getIconForNode(n) : '📎', name: n?.name ?? '' };
@@ -511,9 +515,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (iconDrag?.active) {
       onIconDragChange?.(null);
     }
-    setIconDrag(null);
-    setSelBox(null);
-  }, [iconDrag, onIconDragChange]);
+    clearDragState();
+  }, [iconDrag, onIconDragChange, clearDragState]);
 
   const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
@@ -532,23 +535,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setContextMenu(null);
   }, [items, gridSize]);
 
-  const sortByName = useCallback(() => {
-    setDesktopSort('name'); localStorage.setItem('fetree-desktop-sort', 'name');
-    sortAndPlace((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-  }, [sortAndPlace]);
+  const SORT_COMPARATORS: Record<string, (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number> = {
+    name: (a, b) => (a.name ?? '').localeCompare(b.name ?? ''),
+    type: (a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''),
+    date: (a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0),
+  };
 
-  const sortByType = useCallback(() => {
-    setDesktopSort('type'); localStorage.setItem('fetree-desktop-sort', 'type');
-    sortAndPlace((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
-  }, [sortAndPlace]);
-
-  const sortByDate = useCallback(() => {
-    setDesktopSort('date'); localStorage.setItem('fetree-desktop-sort', 'date');
-    sortAndPlace((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
-  }, [sortAndPlace]);
-
-  const tidyGrid = useCallback(() => {
-    sortAndPlace(() => 0);
+  const applyDesktopSort = useCallback((key: 'name' | 'type' | 'date') => {
+    setDesktopSort(key);
+    localStorage.setItem('fetree-desktop-sort', key);
+    sortAndPlace(SORT_COMPARATORS[key]);
   }, [sortAndPlace]);
 
   const breadcrumb = getPath(currentFolder);
@@ -738,8 +734,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               const offsetX = iconDrag.curX - originPxX;
               const offsetY = iconDrag.curY - originPxY;
 
-              const ghostIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-                ? [...selectedIds] : [iconDrag.id];
+              const ghostIds = getDragIds(iconDrag.id);
 
               return ghostIds.map(gid => {
                 const gpos = iconPositions[gid];
@@ -769,21 +764,6 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 );
               });
             })()}
-            {/* Selection box (rubber band) */}
-            {selBox?.active && (
-              <div
-                className="absolute pointer-events-none"
-                style={{
-                  left: Math.min(selBox.startX, selBox.curX),
-                  top: Math.min(selBox.startY, selBox.curY),
-                  width: Math.abs(selBox.curX - selBox.startX),
-                  height: Math.abs(selBox.curY - selBox.startY),
-                  background: 'rgba(100, 140, 255, 0.1)',
-                  border: '1px solid rgba(100, 140, 255, 0.5)',
-                  zIndex: 10002,
-                }}
-              />
-            )}
           </div>
         ) : (<>
           <div className="grid grid-cols-4 gap-1">
@@ -822,21 +802,22 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               </button>
             ))}
           </div>
-          {selBox?.active && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: Math.min(selBox.startX, selBox.curX),
-                top: Math.min(selBox.startY, selBox.curY),
-                width: Math.abs(selBox.curX - selBox.startX),
-                height: Math.abs(selBox.curY - selBox.startY),
-                background: 'rgba(100, 140, 255, 0.1)',
-                border: '1px solid rgba(100, 140, 255, 0.5)',
-                zIndex: 10002,
-              }}
-            />
-          )}
         </>)}
+        {/* Selection box (rubber band) — shared */}
+        {selBox?.active && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: Math.min(selBox.startX, selBox.curX),
+              top: Math.min(selBox.startY, selBox.curY),
+              width: Math.abs(selBox.curX - selBox.startX),
+              height: Math.abs(selBox.curY - selBox.startY),
+              background: 'rgba(100, 140, 255, 0.1)',
+              border: '1px solid rgba(100, 140, 255, 0.5)',
+              zIndex: 10002,
+            }}
+          />
+        )}
       </div>
 
       {/* Context Menu */}
@@ -903,13 +884,13 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 </button>
                 {subMenu === 'sort' && (
                   <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 100 }}>
-                    <button onClick={() => { setDesktopSort('name'); localStorage.setItem('fetree-desktop-sort', 'name'); sortByName(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                    <button onClick={() => applyDesktopSort('name')} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
                       {desktopSort === 'name' ? '✓ ' : '   '}이름순
                     </button>
-                    <button onClick={() => { setDesktopSort('type'); localStorage.setItem('fetree-desktop-sort', 'type'); sortByType(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                    <button onClick={() => applyDesktopSort('type')} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
                       {desktopSort === 'type' ? '✓ ' : '   '}유형순
                     </button>
-                    <button onClick={() => { setDesktopSort('date'); localStorage.setItem('fetree-desktop-sort', 'date'); sortByDate(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                    <button onClick={() => applyDesktopSort('date')} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
                       {desktopSort === 'date' ? '✓ ' : '   '}날짜순
                     </button>
                   </div>

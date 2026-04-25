@@ -40,6 +40,8 @@
 - [x] 다중선택 드래그 이동 (선택 그룹 전체 고스트 + 함께 이동)
 - [x] Settings 앱 (아이콘 위치 초기화, 그리드 토글, 전체 데이터 초기화 — 제어판)
 - [x] 디버그 그리드 라인 토글 (Settings 연동, fetree-show-grid localStorage)
+- [x] 리팩터링 — Browser 분리, 휴지통 렌더링 통합(TRASH_NODE), tidyGrid 중복 제거
+- [x] 아이콘 위치 persist 버그 수정 — gridSize 초기값{1,1}에서 autoPlace가 저장값 파괴하는 문제
 
 ## 앱 로드맵
 

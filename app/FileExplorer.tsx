@@ -9,7 +9,7 @@ const ICON_POS_KEY = 'fetree-icon-positions';
 
 type IconPositions = Record<string, { col: number; row: number }>;
 const TYPE_ORDER: Record<string, number> = { app: 0, folder: 1, file: 2 };
-const TRASH_NODE: FSNode = { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
+const TRASH_NODE: FSNode = { id: 'trash', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' };
 
 function loadIconPositions(): IconPositions {
   if (typeof window === 'undefined') return {};
@@ -82,6 +82,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (typeof window === 'undefined') return true;
     return localStorage.getItem('fetree-show-grid') !== 'false';
   });
+  const [autoArrange, setAutoArrange] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('fetree-auto-arrange') === 'true';
+  });
 
   const [iconDrag, setIconDrag] = useState<{
     id: string;
@@ -123,7 +127,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     const measure = () => {
       const cols = Math.max(1, Math.floor(el.clientWidth / CELL_W));
       const rows = Math.max(1, Math.floor(el.clientHeight / CELL_H));
-      setGridSize({ cols, rows });
+      setGridSize(prev => (prev.cols === cols && prev.rows === rows) ? prev : { cols, rows });
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -132,13 +136,28 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [isDesktop]);
 
   useEffect(() => {
-    if (!isDesktop) return;
-    const allItems = [...items, { id: '__trash__' }];
-    const saved = loadIconPositions();
-    const placed = autoPlace(allItems, saved, gridSize.cols, gridSize.rows);
-    setIconPositions(placed);
-    saveIconPositions(placed);
-  }, [isDesktop, items, gridSize]);
+    if (!isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
+    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+    if (autoArrange) {
+      allItems.sort((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
+      const next: IconPositions = {};
+      let idx = 0;
+      for (let c = 0; c < gridSize.cols; c++) {
+        for (let r = 0; r < gridSize.rows; r++) {
+          if (idx >= allItems.length) break;
+          next[allItems[idx].id] = { col: c, row: r };
+          idx++;
+        }
+      }
+      setIconPositions(next);
+      saveIconPositions(next);
+    } else {
+      const saved = loadIconPositions();
+      const placed = autoPlace(allItems, saved, gridSize.cols, gridSize.rows);
+      setIconPositions(placed);
+      saveIconPositions(placed);
+    }
+  }, [isDesktop, items, gridSize, autoArrange]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);
@@ -266,7 +285,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const right = Math.max(selBox.startX, curX);
       const bottom = Math.max(selBox.startY, curY);
 
-      const allIds = [...items.map(n => n.id), '__trash__'];
+      const allIds = [...items.map(n => n.id), 'trash'];
       const hit = new Set<string>(selBox.additive ? selBox.baseSelection : []);
       for (const id of allIds) {
         const pos = iconPositions[id];
@@ -289,6 +308,47 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (iconDrag?.active && dropTarget) {
       const dragOrigin = iconPositions[iconDrag.id];
       if (!dragOrigin) { setIconDrag(null); setDropTarget(null); setSelBox(null); return; }
+
+      const trashPos = iconPositions['trash'];
+      if (trashPos && dropTarget.col === trashPos.col && dropTarget.row === trashPos.row && iconDrag.id !== 'trash') {
+        const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+          ? [...selectedIds].filter(id => id !== 'trash')
+          : [iconDrag.id];
+        for (const id of movedIds) moveToTrash(id);
+        setSelectedIds(new Set());
+        setIconDrag(null);
+        setDropTarget(null);
+        setSelBox(null);
+        refresh();
+        return;
+      }
+
+      if (autoArrange) {
+        const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+          ? [...selectedIds].filter(id => id !== 'trash')
+          : [iconDrag.id];
+        const movedSet = new Set(movedIds);
+        const sorted = Object.entries(iconPositions)
+          .sort(([, a], [, b]) => a.col - b.col || a.row - b.row)
+          .map(([id]) => id);
+        const rest = sorted.filter(id => !movedSet.has(id));
+        const dropIdx = dropTarget.col * gridSize.rows + dropTarget.row;
+        const insertAt = Math.min(dropIdx, rest.length);
+        rest.splice(insertAt, 0, ...movedIds);
+        const next: IconPositions = {};
+        let idx = 0;
+        for (let c = 0; c < gridSize.cols; c++) {
+          for (let r = 0; r < gridSize.rows; r++) {
+            if (idx >= rest.length) break;
+            next[rest[idx]] = { col: c, row: r };
+            idx++;
+          }
+        }
+        setIconPositions(next);
+        saveIconPositions(next);
+        setIconDrag(null); setDropTarget(null); setSelBox(null);
+        return;
+      }
 
       const dc = dropTarget.col - dragOrigin.col;
       const dr = dropTarget.row - dragOrigin.row;
@@ -329,10 +389,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setIconDrag(null);
     setDropTarget(null);
     setSelBox(null);
-  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize]);
+  }, [iconDrag, dropTarget, selectedIds, iconPositions, gridSize, refresh, autoArrange]);
 
   const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
-    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: '__trash__', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
     allItems.sort(compareFn);
     const next: IconPositions = {};
     let idx = 0;
@@ -439,7 +499,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             {[...items, TRASH_NODE].map(node => {
               const pos = iconPositions[node.id];
               if (!pos) return null;
-              const isTrash = node.id === '__trash__';
+              const isTrash = node.id === 'trash';
               const isDragging = iconDrag?.active && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has(node.id)));
               const isSelected = selectedIds.has(node.id);
               return (
@@ -501,9 +561,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               return ghostIds.map(gid => {
                 const gpos = iconPositions[gid];
                 if (!gpos) return null;
-                const gNode = gid === '__trash__' ? TRASH_NODE : items.find(n => n.id === gid);
+                const gNode = gid === 'trash' ? TRASH_NODE : items.find(n => n.id === gid);
                 if (!gNode) return null;
-                const gIcon = gid === '__trash__' ? '🗑️' : getIconForNode(gNode);
+                const gIcon = gid === 'trash' ? '🗑️' : getIconForNode(gNode);
                 const gLabel = gNode.name;
                 return (
                   <div
@@ -587,7 +647,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           onClick={(e) => e.stopPropagation()}
         >
           {contextMenu.node ? (
-            contextMenu.node.id === '__trash__' ? (<>
+            contextMenu.node.id === 'trash' ? (<>
               <button onClick={() => {
                 onOpenFile?.(TRASH_NODE);
                 setContextMenu(null);
@@ -611,6 +671,14 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               <button onClick={sortByType} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">유형순 정렬</button>
               <button onClick={sortByDate} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">날짜순 정렬</button>
               <div className="border-t border-white/10 my-0.5" />
+              <button onClick={() => {
+                const next = !autoArrange;
+                setAutoArrange(next);
+                localStorage.setItem('fetree-auto-arrange', String(next));
+                setContextMenu(null);
+              }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                {autoArrange ? '✓ ' : '   '}자동 정렬
+              </button>
               <button onClick={tidyGrid} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">그리드에 맞춤</button>
             </>)}
           </>)}

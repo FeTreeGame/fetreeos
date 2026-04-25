@@ -104,18 +104,101 @@
 ### P1: loadFS() 반복 파싱 (fileSystem.ts)
 
 모든 FS 함수(getChildren, getNode, getPath, getDepth 등)가 호출마다 `localStorage.getItem + JSON.parse(전체 FS)`를 수행.
-- fileSystem.ts 내부에서 loadFS() 호출 14곳. 함수 간 연쇄 호출도 있음 (moveNodes → getDepth → loadFS 추가 1회)
+
+**호출 빈도 분석:**
+
+- fileSystem.ts 내부에서 loadFS() 호출 14곳
+- 함수 간 연쇄 호출: moveNodes → getDepth → loadFS 추가 1회
 - FileExplorer 렌더 1회에 최소 getChildren(1) + getPath(1) = loadFS() 2회
-- 파일 수 N에 비례하는 비용이 렌더마다 반복. 현재 수십 개 수준에서는 무해하지만 100+ 시 체감 가능
-- **해결 방향**: 인메모리 캐시 도입 (write 시 invalidate). Supabase 전환 시에도 동일 패턴 적용 가능
+- 바탕화면 + 탐색기 창 2개 열린 상태에서 렌더 1회 = loadFS() 6회
+- 파일 이동 1회: moveNodes 내부 loadFS(1) + getDepth 내부 loadFS(1) + refresh 후 getChildren loadFS(1) = 3회
+
+**스케일 시나리오:**
+
+- 현재 FS 노드 ~20개: JSON.parse 비용 무시 가능 (~0.1ms)
+- 100개: ~0.5ms × 3회 = 1.5ms/액션
+- 500개 (Supabase 전환 후 현실적): JSON 파싱 자체는 빠르지만, 매 렌더마다 500개 객체 배열 생성 + filter/find 순회가 GC 압박
+
+**해결 — 인메모리 캐시:**
+
+```typescript
+let cache: FSNode[] | null = null;
+
+function loadFS(): FSNode[] {
+  if (cache) return cache;
+  cache = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
+  return cache;
+}
+
+function saveFS(nodes: FSNode[]): void {
+  cache = nodes;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(nodes));
+}
+```
+
+14곳 전부 캐시 히트. 파싱은 페이지 로드 시 1회만. 기존 API 시그니처 변경 없음.
+
+**주의점**: 현재 moveNodes 등이 loadFS() 결과를 직접 mutate하고 있음 (`node.parentId = targetParentId`).
+캐시 도입 시 읽기 측에서 shallow copy가 필요하거나, write 함수 내부에서만 mutate를 허용하는 규칙이 필요.
+
+**착수 조건**: 기능 추가 없이 fileSystem.ts 내부만 수정. 외부 API 변경 없음. 지금 바로 가능.
 
 ### P2: 창 드래그/리사이즈 시 전체 리렌더 (page.tsx)
 
 `handlePointerMove`에서 `setWindows(prev => prev.map(...))` — pointermove 60fps마다 windows 배열 전체 복사.
 Home 컴포넌트가 리렌더되면 모든 창 + 바탕화면(FileExplorer desktop)도 VDOM diff 대상.
-- 드래그 중인 창 1개만 변경되는데 전체 windows.map이 실행됨
-- FileExplorer(desktop)는 props 불변이면 React가 스킵하지만, 인라인 콜백이 있어 실제로는 매번 리렌더
-- **해결 방향**: (a) 개별 창을 React.memo로 분리, (b) 드래그 중 좌표를 ref로 관리 + requestAnimationFrame으로 DOM 직접 갱신, (c) CSS transform 기반 이동 (compositor 레이어)
+
+**리렌더 전파 경로 (창 드래그 1프레임):**
+
+```
+pointermove
+  → setWindows([...]) — 배열 새 참조
+  → Home 리렌더
+    → windows.map — 모든 창 JSX 재생성
+      → 각 창 style 객체 새로 생성 (인라인 = 매번 새 참조)
+      → FileExplorer(desktop) — props에 인라인 콜백 → 매번 리렌더
+        → 아이콘 N개 전부 VDOM diff
+      → 다른 창들 — props 불변이어도 인라인 style 새 참조 → 리렌더
+```
+
+창 1개의 x,y만 바뀌는데 전체 페이지가 리렌더됨.
+TODO '드래그 반응성 개선 — React state→DOM 1프레임 지연'의 근본 원인이 이것.
+
+**해결 방향 3단계 (비용↔효과 순):**
+
+**(a) React.memo + Window 컴포넌트 분리 — 지금 바로 가능**
+
+page.tsx의 `windows.map` 내부 JSX를 `React.memo(Window)` 컴포넌트로 추출.
+props가 안 바뀐 창은 리렌더 스킵. 인라인 콜백(`() => focusWindow(win.id)` 등)을
+`useCallback`으로 안정화해야 memo가 효과를 발휘함.
+
+- 작업량: page.tsx에서 창 렌더링 부분을 컴포넌트로 추출 + 콜백 안정화
+- 효과: 드래그 중 다른 창과 바탕화면 리렌더 차단. 체감 개선 기대
+- 한계: 드래그 대상 창 자체는 여전히 setState → 1프레임 지연
+
+**(b) ref + rAF 직접 DOM 갱신 — 드래그 반응성이 실제 문제될 때**
+
+드래그 중에는 React state를 건드리지 않고 `useRef`로 좌표 추적,
+`requestAnimationFrame`으로 해당 DOM 요소의 `style.left/top`만 직접 갱신.
+드래그 끝나면 최종 좌표를 setState로 확정. daedalOS가 이 패턴 사용.
+
+- 작업량: 드래그 로직 전면 재구성. 스냅 프리뷰도 rAF 연동 필요
+- 효과: 드래그 중 React 리렌더 0회. 사실상 네이티브 수준 반응성
+- 한계: 코드 복잡도 증가. React 상태와 DOM 상태 동기화 관리 필요
+
+**(c) CSS transform + will-change — (b)와 조합 시**
+
+`left/top` % 대신 `transform: translate(x, y)`로 이동하면 브라우저가
+해당 요소를 별도 합성(compositor) 레이어로 승격. 리페인트 없이 GPU에서 이동.
+(b)와 조합하면 최적. 단독으로는 의미 제한적 (setState 비용이 주병목이므로).
+
+**'지금 바로 가능'의 의미:**
+
+P1과 P2(a)는 외부 동작 변경 없이 내부 구현만 수정하는 작업.
+P1은 fileSystem.ts 내부에 캐시 변수 추가 + saveFS에서 갱신, 외부 함수 시그니처 불변.
+P2(a)는 page.tsx의 창 렌더링 JSX를 별도 컴포넌트로 추출 + memo 감싸기.
+둘 다 기능 추가/변경 없이 성능만 개선. 새 기능 작업 전에 끼워넣기 좋은 타이밍.
+P2(b)(c)는 드래그 체감이 실제로 문제될 때 — 스냅/리사이즈 전체를 rAF로 전환해야 하므로 단독 작업 단위.
 
 ### P3~P4 (낮은 우선순위)
 

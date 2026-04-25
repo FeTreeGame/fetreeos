@@ -1,19 +1,16 @@
 import { useCallback } from 'react';
 import { getIconForNode, type FSNode } from './fileSystem';
-import type { IconDragInfo } from './FileExplorer';
-
-type IconDrag = { id: string; startX: number; startY: number; curX: number; curY: number; active: boolean };
-type SelBox = { startX: number; startY: number; curX: number; curY: number; active: boolean; additive: boolean; baseSelection: Set<string> };
+import { type IconDragInfo, type IconDragState, type SelBoxState } from './constants';
 
 interface UseExplorerDragParams {
   contentRef: React.RefObject<HTMLDivElement | null>;
   items: FSNode[];
   selectedIds: Set<string>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-  iconDrag: IconDrag | null;
-  setIconDrag: React.Dispatch<React.SetStateAction<IconDrag | null>>;
-  selBox: SelBox | null;
-  setSelBox: React.Dispatch<React.SetStateAction<SelBox | null>>;
+  iconDrag: IconDragState;
+  setIconDrag: React.Dispatch<React.SetStateAction<IconDragState>>;
+  selBox: SelBoxState;
+  setSelBox: React.Dispatch<React.SetStateAction<SelBoxState>>;
   currentFolder: string;
   onIconDragChange?: (info: IconDragInfo | null) => void;
   clearDragState: () => void;

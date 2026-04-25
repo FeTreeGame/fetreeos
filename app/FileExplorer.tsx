@@ -5,11 +5,9 @@ import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNod
 import ContextMenu from './ContextMenu';
 import { useDesktopDrag } from './useDesktopDrag';
 import { useExplorerDrag } from './useExplorerDrag';
-import { CELL_W, CELL_H, TRASH_NODE, TYPE_ORDER } from './constants';
+import { CELL_W, CELL_H, TRASH_NODE, TYPE_ORDER, SORT_COMPARATORS, placeOnGrid, type IconDragInfo, type IconPositions, type IconDragState, type SelBoxState, type DropTargetState, type SortKey } from './constants';
 
 const ICON_POS_KEY = 'fetree-icon-positions';
-
-type IconPositions = Record<string, { col: number; row: number }>;
 
 function loadIconPositions(): IconPositions {
   if (typeof window === 'undefined') return {};
@@ -57,14 +55,6 @@ function autoPlace(
   return result;
 }
 
-export interface IconDragInfo {
-  ids: string[];
-  sourceFolder: string;
-  ghosts: { icon: string; name: string }[];
-  curX: number;
-  curY: number;
-}
-
 interface FileExplorerProps {
   mode?: 'desktop' | 'explorer';
   initialFolderId?: string;
@@ -98,32 +88,17 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('fetree-auto-arrange') === 'true';
   });
-  const [desktopSort, setDesktopSort] = useState<'name' | 'type' | 'date'>(() => {
+  const [desktopSort, setDesktopSort] = useState<SortKey>(() => {
     if (typeof window === 'undefined') return 'type';
-    return (localStorage.getItem('fetree-desktop-sort') as 'name' | 'type' | 'date') || 'type';
+    return (localStorage.getItem('fetree-desktop-sort') as SortKey) || 'type';
   });
-  const [explorerSort, setExplorerSort] = useState<'name' | 'type' | 'date' | null>(null);
+  const [explorerSort, setExplorerSort] = useState<SortKey | null>(null);
 
-  const [iconDrag, setIconDrag] = useState<{
-    id: string;
-    startX: number;
-    startY: number;
-    curX: number;
-    curY: number;
-    active: boolean;
-  } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ col: number; row: number; center: boolean; afterY: boolean } | null>(null);
+  const [iconDrag, setIconDrag] = useState<IconDragState>(null);
+  const [dropTarget, setDropTarget] = useState<DropTargetState>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selBox, setSelBox] = useState<{
-    startX: number;
-    startY: number;
-    curX: number;
-    curY: number;
-    active: boolean;
-    additive: boolean;
-    baseSelection: Set<string>;
-  } | null>(null);
+  const [selBox, setSelBox] = useState<SelBoxState>(null);
 
   const refresh = useCallback(() => {
     setItems(getChildren(currentFolder));
@@ -158,18 +133,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (!isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
     if (autoArrange) {
-      if (desktopSort === 'name') allItems.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-      else if (desktopSort === 'date') allItems.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
-      else allItems.sort((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
-      const next: IconPositions = {};
-      let idx = 0;
-      for (let c = 0; c < gridSize.cols; c++) {
-        for (let r = 0; r < gridSize.rows; r++) {
-          if (idx >= allItems.length) break;
-          next[allItems[idx].id] = { col: c, row: r };
-          idx++;
-        }
-      }
+      allItems.sort(SORT_COMPARATORS[desktopSort]);
+      const next = placeOnGrid(allItems, gridSize.cols, gridSize.rows);
       setIconPositions(next);
       saveIconPositions(next);
     } else {
@@ -292,34 +257,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     currentFolder, onIconDragChange, clearDragState, getDragIds,
   });
 
-  const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
+  const applyDesktopSort = useCallback((key: SortKey) => {
+    setDesktopSort(key);
+    localStorage.setItem('fetree-desktop-sort', key);
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
-    allItems.sort(compareFn);
-    const next: IconPositions = {};
-    let idx = 0;
-    for (let c = 0; c < gridSize.cols; c++) {
-      for (let r = 0; r < gridSize.rows; r++) {
-        if (idx >= allItems.length) break;
-        next[allItems[idx].id] = { col: c, row: r };
-        idx++;
-      }
-    }
+    allItems.sort(SORT_COMPARATORS[key]);
+    const next = placeOnGrid(allItems, gridSize.cols, gridSize.rows);
     setIconPositions(next);
     saveIconPositions(next);
     setContextMenu(null);
   }, [items, gridSize]);
-
-  const SORT_COMPARATORS: Record<string, (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number> = {
-    name: (a, b) => (a.name ?? '').localeCompare(b.name ?? ''),
-    type: (a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''),
-    date: (a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0),
-  };
-
-  const applyDesktopSort = useCallback((key: 'name' | 'type' | 'date') => {
-    setDesktopSort(key);
-    localStorage.setItem('fetree-desktop-sort', key);
-    sortAndPlace(SORT_COMPARATORS[key]);
-  }, [sortAndPlace]);
 
   const breadcrumb = getPath(currentFolder);
 
@@ -541,14 +488,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           </div>
         ) : (<>
           <div className="grid grid-cols-4 gap-1">
-            {(() => {
-              if (!explorerSort) return items;
-              const sorted = [...items];
-              if (explorerSort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
-              else if (explorerSort === 'type') sorted.sort((a, b) => (TYPE_ORDER[a.type] ?? 2) - (TYPE_ORDER[b.type] ?? 2) || a.name.localeCompare(b.name));
-              else if (explorerSort === 'date') sorted.sort((a, b) => a.createdAt - b.createdAt);
-              return sorted;
-            })().map(node => (
+            {(explorerSort ? [...items].sort(SORT_COMPARATORS[explorerSort]) : items).map(node => (
               <button
                 key={node.id}
                 data-node-id={node.id}

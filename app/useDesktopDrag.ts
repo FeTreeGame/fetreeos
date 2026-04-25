@@ -1,12 +1,6 @@
 import { useCallback } from 'react';
 import { getIconForNode, moveNodes, type FSNode } from './fileSystem';
-import type { IconDragInfo } from './FileExplorer';
-import { CELL_W, CELL_H, TRASH_NODE } from './constants';
-
-type IconPositions = Record<string, { col: number; row: number }>;
-type DropTarget = { col: number; row: number; center: boolean; afterY: boolean };
-type SelBox = { startX: number; startY: number; curX: number; curY: number; active: boolean; additive: boolean; baseSelection: Set<string> };
-type IconDrag = { id: string; startX: number; startY: number; curX: number; curY: number; active: boolean };
+import { CELL_W, CELL_H, TRASH_NODE, type IconDragInfo, type IconPositions, type IconDragState, type SelBoxState, type DropTargetState } from './constants';
 
 interface UseDesktopDragParams {
   contentRef: React.RefObject<HTMLDivElement | null>;
@@ -17,12 +11,12 @@ interface UseDesktopDragParams {
   items: FSNode[];
   selectedIds: Set<string>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-  iconDrag: IconDrag | null;
-  setIconDrag: React.Dispatch<React.SetStateAction<IconDrag | null>>;
-  dropTarget: DropTarget | null;
-  setDropTarget: React.Dispatch<React.SetStateAction<DropTarget | null>>;
-  selBox: SelBox | null;
-  setSelBox: React.Dispatch<React.SetStateAction<SelBox | null>>;
+  iconDrag: IconDragState;
+  setIconDrag: React.Dispatch<React.SetStateAction<IconDragState>>;
+  dropTarget: DropTargetState;
+  setDropTarget: React.Dispatch<React.SetStateAction<DropTargetState>>;
+  selBox: SelBoxState;
+  setSelBox: React.Dispatch<React.SetStateAction<SelBoxState>>;
   autoArrange: boolean;
   currentFolder: string;
   onIconDragChange?: (info: IconDragInfo | null) => void;

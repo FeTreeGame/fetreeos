@@ -1,8 +1,7 @@
 'use client';
 
 import type { FSNode } from './fileSystem';
-
-type SortKey = 'name' | 'type' | 'date';
+import type { SortKey } from './constants';
 
 interface ContextMenuProps {
   x: number;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNodes, emptyTrash, deleteNode, updateNode, type FSNode } from './fileSystem';
+import ContextMenu from './ContextMenu';
 
 const CELL_W = 90;
 const CELL_H = 90;
@@ -822,102 +823,35 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
       {/* Context Menu */}
       {contextMenu && (
-        <div
-          className="fixed rounded shadow-xl"
-          style={{
-            left: contextMenu.x,
-            top: contextMenu.y,
-            background: '#2a2a3a',
-            border: '1px solid rgba(255,255,255,0.12)',
-            zIndex: 10000,
-            minWidth: 140,
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          node={contextMenu.node}
+          currentFolder={currentFolder}
+          isDesktop={isDesktop}
+          autoArrange={autoArrange}
+          desktopSort={desktopSort}
+          explorerSort={explorerSort}
+          subMenu={subMenu}
+          onClose={() => setContextMenu(null)}
+          onOpen={(node) => { if (node.id === 'trash') onOpenFile?.(TRASH_NODE); else handleDoubleClick(node); setContextMenu(null); }}
+          onDelete={(id) => { handleDelete(id); }}
+          onPermanentDelete={(id) => { deleteNode(id); setContextMenu(null); refresh(); }}
+          onRestore={(id) => { moveNodes([id], 'desktop'); setContextMenu(null); refresh(); }}
+          onRename={(node) => startRename(node)}
+          onNewFile={handleNewFile}
+          onNewFolder={handleNewFolder}
+          onEmptyTrash={() => { emptyTrash(); refresh(); setContextMenu(null); }}
+          onToggleAutoArrange={() => {
+            const next = !autoArrange;
+            setAutoArrange(next);
+            localStorage.setItem('fetree-auto-arrange', String(next));
+            setContextMenu(null);
           }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {!contextMenu.node && currentFolder === 'trash' ? (<>
-            <button onClick={() => { emptyTrash(); refresh(); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">휴지통 비우기</button>
-          </>) : contextMenu.node ? (
-            contextMenu.node.id === 'trash' ? (<>
-              <button onClick={() => {
-                onOpenFile?.(TRASH_NODE);
-                setContextMenu(null);
-              }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
-              <div className="border-t border-white/10 my-0.5" />
-              <button onClick={() => { emptyTrash(); refresh(); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">휴지통 비우기</button>
-            </>) : currentFolder === 'trash' ? (<>
-              <button onClick={() => { moveNodes([contextMenu.node!.id], 'desktop'); setContextMenu(null); refresh(); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">복원</button>
-              <div className="border-t border-white/10 my-0.5" />
-              <button onClick={() => { deleteNode(contextMenu.node!.id); setContextMenu(null); refresh(); }} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">완전 삭제</button>
-            </>) : (<>
-              <button onClick={() => handleDoubleClick(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">열기</button>
-              {contextMenu.node.type !== 'app' && (<>
-                <button onClick={() => startRename(contextMenu.node!)} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름 변경</button>
-                <div className="border-t border-white/10 my-0.5" />
-                <button onClick={() => handleDelete(contextMenu.node!.id)} className="w-full text-left px-3 py-1.5 text-xs text-red-400/70 hover:bg-white/10">삭제</button>
-              </>)}
-            </>)
-          ) : (<>
-            <div className="relative" onMouseEnter={() => setSubMenu('create')} onMouseLeave={() => setSubMenu(null)}>
-              <button className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 flex justify-between items-center">
-                새로 만들기 <span className="text-[10px] text-white/40">▶</span>
-              </button>
-              {subMenu === 'create' && (
-                <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 120 }}>
-                  <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">텍스트 파일</button>
-                  <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">폴더</button>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-white/10 my-0.5" />
-            {isDesktop ? (<>
-              <button onClick={() => {
-                const next = !autoArrange;
-                setAutoArrange(next);
-                localStorage.setItem('fetree-auto-arrange', String(next));
-                setContextMenu(null);
-              }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                {autoArrange ? '✓ ' : '   '}자동 정렬
-              </button>
-              <div className="relative" onMouseEnter={() => setSubMenu('sort')} onMouseLeave={() => setSubMenu(null)}>
-                <button className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 flex justify-between items-center">
-                  정렬 기준 <span className="text-[10px] text-white/40">▶</span>
-                </button>
-                {subMenu === 'sort' && (
-                  <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 100 }}>
-                    <button onClick={() => applyDesktopSort('name')} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                      {desktopSort === 'name' ? '✓ ' : '   '}이름순
-                    </button>
-                    <button onClick={() => applyDesktopSort('type')} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                      {desktopSort === 'type' ? '✓ ' : '   '}유형순
-                    </button>
-                    <button onClick={() => applyDesktopSort('date')} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                      {desktopSort === 'date' ? '✓ ' : '   '}날짜순
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>) : (<>
-              <div className="relative" onMouseEnter={() => setSubMenu('sort')} onMouseLeave={() => setSubMenu(null)}>
-                <button className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10 flex justify-between items-center">
-                  정렬 기준 <span className="text-[10px] text-white/40">▶</span>
-                </button>
-                {subMenu === 'sort' && (
-                  <div className="absolute left-full top-0 rounded shadow-xl overflow-hidden" style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', minWidth: 100 }}>
-                    <button onClick={() => { setExplorerSort(explorerSort === 'name' ? null : 'name'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                      {explorerSort === 'name' ? '✓ ' : '   '}이름순
-                    </button>
-                    <button onClick={() => { setExplorerSort(explorerSort === 'type' ? null : 'type'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                      {explorerSort === 'type' ? '✓ ' : '   '}유형순
-                    </button>
-                    <button onClick={() => { setExplorerSort(explorerSort === 'date' ? null : 'date'); setContextMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
-                      {explorerSort === 'date' ? '✓ ' : '   '}날짜순
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>)}
-          </>)}
-        </div>
+          onDesktopSort={(key) => applyDesktopSort(key)}
+          onExplorerSort={(key) => { setExplorerSort(explorerSort === key ? null : key); setContextMenu(null); }}
+          onSubMenu={setSubMenu}
+        />
       )}
 
       {/* Status bar — explorer only */}

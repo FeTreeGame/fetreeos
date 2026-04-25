@@ -409,7 +409,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               return (
                 <button
                   key={node.id}
-                  className="absolute flex flex-col items-center justify-center rounded transition-colors"
+                  className="absolute flex flex-col items-center justify-center rounded group"
                   style={{
                     left: pos.col * CELL_W,
                     top: pos.row * CELL_H,
@@ -417,25 +417,24 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     height: CELL_H,
                     padding: 6,
                     opacity: isDragging ? 0.3 : 1,
-                    background: isSelected ? 'rgba(100, 140, 255, 0.2)' : undefined,
-                    outline: isSelected ? '1px solid rgba(100, 140, 255, 0.5)' : undefined,
                   }}
                   onPointerDown={(e) => handleIconPointerDown(node.id, e)}
                   onDoubleClick={() => { if (!iconDrag?.active) handleDoubleClick(node); }}
                   onContextMenu={(e) => handleContextMenu(e, node)}
                 >
-                  <span className="text-3xl">{getIconForNode(node)}</span>
+                  <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : 'group-hover:bg-blue-500/10'}`} />
+                  <span className="text-3xl relative">{getIconForNode(node)}</span>
                   {renaming === node.id ? (
                     <input
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
                       onBlur={commitRename}
                       onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(null); }}
-                      className="w-full text-[10px] text-center bg-zinc-800 text-white border border-blue-500 outline-none rounded px-1 mt-1"
+                      className="relative w-full text-[10px] text-center bg-zinc-800 text-white border border-blue-500 outline-none rounded px-1 mt-1"
                       autoFocus
                     />
                   ) : (
-                    <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    <span className="relative text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                       {node.name}
                     </span>
                   )}
@@ -450,7 +449,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               const isSelected = selectedIds.has('__trash__');
               return (
                 <button
-                  className="absolute flex flex-col items-center justify-center rounded transition-colors"
+                  className="absolute flex flex-col items-center justify-center rounded group"
                   style={{
                     left: pos.col * CELL_W,
                     top: pos.row * CELL_H,
@@ -458,8 +457,6 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     height: CELL_H,
                     padding: 6,
                     opacity: isDragging ? 0.3 : 1,
-                    background: isSelected ? 'rgba(100, 140, 255, 0.2)' : undefined,
-                    outline: isSelected ? '1px solid rgba(100, 140, 255, 0.5)' : undefined,
                   }}
                   onPointerDown={(e) => handleIconPointerDown('__trash__', e)}
                   onDoubleClick={() => { if (iconDrag?.active) return;
@@ -472,8 +469,9 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     setContextMenu({ x: e.clientX, y: e.clientY, node: { id: '__trash__', name: '휴지통', type: 'folder', parentId: '', createdAt: 0, updatedAt: 0, icon: '🗑️' } as FSNode });
                   }}
                 >
-                  <span className="text-3xl">🗑️</span>
-                  <span className="text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                  <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : 'group-hover:bg-blue-500/10'}`} />
+                  <span className="text-3xl relative">🗑️</span>
+                  <span className="relative text-[11px] text-white mt-1 text-center leading-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                     휴지통
                   </span>
                 </button>

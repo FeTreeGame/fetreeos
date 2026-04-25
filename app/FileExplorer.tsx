@@ -87,6 +87,15 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ col: number; row: number } | null>(null);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selBox, setSelBox] = useState<{
+    startX: number;
+    startY: number;
+    curX: number;
+    curY: number;
+    active: boolean;
+  } | null>(null);
+
   const refresh = useCallback(() => {
     setItems(getChildren(currentFolder));
     onFSChange?.();
@@ -186,26 +195,73 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   const handleIconPointerDown = useCallback((id: string, e: React.PointerEvent) => {
     if (!isDesktop) return;
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+    } else {
+      setSelectedIds(new Set([id]));
+    }
     setIconDrag({ id, startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY, active: false });
   }, [isDesktop]);
 
-  const handleDesktopPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!iconDrag) return;
-    const dx = e.clientX - iconDrag.startX;
-    const dy = e.clientY - iconDrag.startY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (!iconDrag.active && dist < 5) return;
-
+  const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
+    if (!isDesktop) return;
+    if (!e.ctrlKey && !e.metaKey) setSelectedIds(new Set());
     const el = contentRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const col = Math.max(0, Math.min(gridSize.cols - 1, Math.floor((e.clientX - rect.left) / CELL_W)));
-    const row = Math.max(0, Math.min(gridSize.rows - 1, Math.floor((e.clientY - rect.top) / CELL_H)));
+    setSelBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, curX: e.clientX - rect.left, curY: e.clientY - rect.top, active: false });
+  }, [isDesktop]);
 
-    setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
-    setDropTarget({ col, row });
-  }, [iconDrag, gridSize]);
+  const handleDesktopPointerMove = useCallback((e: React.PointerEvent) => {
+    if (iconDrag) {
+      const dx = e.clientX - iconDrag.startX;
+      const dy = e.clientY - iconDrag.startY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (!iconDrag.active && dist < 5) return;
+
+      const el = contentRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const col = Math.max(0, Math.min(gridSize.cols - 1, Math.floor((e.clientX - rect.left) / CELL_W)));
+      const row = Math.max(0, Math.min(gridSize.rows - 1, Math.floor((e.clientY - rect.top) / CELL_H)));
+
+      setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
+      setDropTarget({ col, row });
+      return;
+    }
+
+    if (selBox) {
+      const el = contentRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const curX = e.clientX - rect.left;
+      const curY = e.clientY - rect.top;
+      setSelBox(prev => prev ? { ...prev, curX, curY, active: true } : null);
+
+      const left = Math.min(selBox.startX, curX);
+      const top = Math.min(selBox.startY, curY);
+      const right = Math.max(selBox.startX, curX);
+      const bottom = Math.max(selBox.startY, curY);
+
+      const allIds = [...items.map(n => n.id), '__trash__'];
+      const hit = new Set<string>();
+      for (const id of allIds) {
+        const pos = iconPositions[id];
+        if (!pos) continue;
+        const cx = pos.col * CELL_W + CELL_W / 2;
+        const cy = pos.row * CELL_H + CELL_H / 2;
+        if (cx >= left && cx <= right && cy >= top && cy <= bottom) {
+          hit.add(id);
+        }
+      }
+      setSelectedIds(hit);
+    }
+  }, [iconDrag, selBox, gridSize, items, iconPositions]);
 
   const handleDesktopPointerUp = useCallback(() => {
     if (iconDrag?.active && dropTarget) {
@@ -224,6 +280,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     }
     setIconDrag(null);
     setDropTarget(null);
+    setSelBox(null);
   }, [iconDrag, dropTarget]);
 
   const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : items.length >= 0 ? currentFolder : currentFolder;
@@ -258,6 +315,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         ref={contentRef}
         className={`flex-1 overflow-auto ${isDesktop ? '' : 'p-3'}`}
         onContextMenu={(e) => handleContextMenu(e)}
+        onPointerDown={isDesktop ? handleBgPointerDown : undefined}
         onPointerMove={isDesktop ? handleDesktopPointerMove : undefined}
         onPointerUp={isDesktop ? handleDesktopPointerUp : undefined}
       >
@@ -301,10 +359,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               const pos = iconPositions[node.id];
               if (!pos) return null;
               const isDragging = iconDrag?.active && iconDrag.id === node.id;
+              const isSelected = selectedIds.has(node.id);
               return (
                 <button
                   key={node.id}
-                  className="absolute flex flex-col items-center justify-center rounded hover:bg-white/10 transition-colors"
+                  className="absolute flex flex-col items-center justify-center rounded transition-colors"
                   style={{
                     left: pos.col * CELL_W,
                     top: pos.row * CELL_H,
@@ -312,6 +371,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     height: CELL_H,
                     padding: 6,
                     opacity: isDragging ? 0.3 : 1,
+                    background: isSelected ? 'rgba(100, 140, 255, 0.2)' : undefined,
+                    outline: isSelected ? '1px solid rgba(100, 140, 255, 0.5)' : undefined,
                   }}
                   onPointerDown={(e) => handleIconPointerDown(node.id, e)}
                   onDoubleClick={() => { if (!iconDrag?.active) handleDoubleClick(node); }}
@@ -340,9 +401,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               const pos = iconPositions['__trash__'];
               if (!pos) return null;
               const isDragging = iconDrag?.active && iconDrag.id === '__trash__';
+              const isSelected = selectedIds.has('__trash__');
               return (
                 <button
-                  className="absolute flex flex-col items-center justify-center rounded hover:bg-white/10 transition-colors"
+                  className="absolute flex flex-col items-center justify-center rounded transition-colors"
                   style={{
                     left: pos.col * CELL_W,
                     top: pos.row * CELL_H,
@@ -350,6 +412,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     height: CELL_H,
                     padding: 6,
                     opacity: isDragging ? 0.3 : 1,
+                    background: isSelected ? 'rgba(100, 140, 255, 0.2)' : undefined,
+                    outline: isSelected ? '1px solid rgba(100, 140, 255, 0.5)' : undefined,
                   }}
                   onPointerDown={(e) => handleIconPointerDown('__trash__', e)}
                   onDoubleClick={() => { if (iconDrag?.active) return;
@@ -395,6 +459,21 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                 </div>
               );
             })()}
+            {/* Selection box (rubber band) */}
+            {selBox?.active && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: Math.min(selBox.startX, selBox.curX),
+                  top: Math.min(selBox.startY, selBox.curY),
+                  width: Math.abs(selBox.curX - selBox.startX),
+                  height: Math.abs(selBox.curY - selBox.startY),
+                  background: 'rgba(100, 140, 255, 0.1)',
+                  border: '1px solid rgba(100, 140, 255, 0.5)',
+                  zIndex: 10002,
+                }}
+              />
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-1">

@@ -16,6 +16,7 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
   const [openDialog, setOpenDialog] = useState(false);
   const [txtFiles, setTxtFiles] = useState<FSNode[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (fileId) {
@@ -24,14 +25,18 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
         setCurrentFileId(node.id);
         setTitle(node.name);
         setContent(node.content ?? '');
+        initialized.current = true;
         return;
       }
     }
+    if (initialized.current) return;
+    initialized.current = true;
     const node = createFile('desktop', '새 메모.txt', '');
     setCurrentFileId(node.id);
     setTitle(node.name);
     setContent('');
-  }, [fileId]);
+    onFSChange?.();
+  }, [fileId, onFSChange]);
 
   useEffect(() => {
     if (!menuOpen) return;

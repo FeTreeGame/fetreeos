@@ -245,14 +245,22 @@ export default function Home() {
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
-      const els = document.elementsFromPoint(e.clientX, e.clientY);
-      const dropEl = els.find(el => el.getAttribute('data-drop-folder'));
-      if (dropEl) {
-        const targetFolder = dropEl.getAttribute('data-drop-folder')!;
-        if (targetFolder !== iconDragInfo.sourceFolder) {
-          moveNodes(iconDragInfo.ids, targetFolder);
-          refreshDesktop();
+      const allDropTargets = document.querySelectorAll<HTMLElement>('[data-drop-folder]');
+      let targetFolder: string | null = null;
+      let topZ = -1;
+      for (const el of allDropTargets) {
+        const rect = el.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          const z = parseInt(getComputedStyle(el.closest('[id^="win-"]') || el).zIndex || '0', 10);
+          if (z > topZ) {
+            topZ = z;
+            targetFolder = el.getAttribute('data-drop-folder');
+          }
         }
+      }
+      if (targetFolder && targetFolder !== iconDragInfo.sourceFolder) {
+        moveNodes(iconDragInfo.ids, targetFolder);
+        refreshDesktop();
       }
       setIconDragInfo(null);
     }
@@ -322,6 +330,7 @@ export default function Home() {
                 border: isMax ? 'none' : '1px solid rgba(255,255,255,0.15)',
                 borderRadius: isMax ? 0 : 4,
                 overflow: 'hidden',
+                pointerEvents: iconDragInfo ? 'none' as const : undefined,
               } : {
                 left: `${win.x * 100}%`,
                 top: `${win.y * 100}%`,
@@ -333,6 +342,7 @@ export default function Home() {
                 overflow: 'hidden',
                 minWidth: MIN_W_PX,
                 minHeight: MIN_H_PX,
+                pointerEvents: iconDragInfo ? 'none' as const : undefined,
               }}
               onPointerDown={() => focusWindow(win.id)}
               onClick={(e) => e.stopPropagation()}
@@ -395,7 +405,7 @@ export default function Home() {
                   <Notepad fileId={win.fileId} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'explorer' && (
-                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} onOpenFile={openNode} onFSChange={refreshDesktop} />
+                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} />
                 )}
                 {win.app.type === 'settings' && (
                   <Settings onFSChange={refreshDesktop} />

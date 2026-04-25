@@ -69,20 +69,18 @@
 - [x] 휴지통 탐색기 — 복원/완전삭제 UI (우클릭 메뉴 분기, 배경 메뉴 비우기)
 - [x] 정렬 상태 저장 (desktopSort localStorage 저장, 새로고침 후 유지)
 - [x] 컨텍스트 메뉴 서브메뉴 (새로 만들기 ▶, 정렬 기준 ▶ — 호버 펼침)
-- [ ] 탐색기 ↔ 바탕화면 간 드래그 드롭 파일 이동
+- [x] 바탕화면 → 탐색기 드래그 드롭 파일 이동 (pointerEvents 투과 + querySelectorAll rect 판정 + zIndex 최상위 선택)
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
 
 ### 크로스 드래그 드롭 — 설계 메모
 
-현재 인프라 구축 완료, 실제 동작은 미검증:
-- `data-drop-folder` 속성으로 각 FileExplorer 콘텐츠 영역 식별
+바탕화면 → 탐색기 방향 동작 완료. 구현 구조:
+- `data-drop-folder={currentFolder}` 속성으로 각 FileExplorer 콘텐츠 영역 식별
 - `onIconDragChange` → page.tsx에 드래그 중인 ids/sourceFolder 전달
-- page.tsx `handlePointerUp`에서 `elementsFromPoint` + `moveNodes` 판정
-- 미해결: 바탕화면 pointer 이벤트가 탐색기 창에 가려져 끊기는 문제
-  - page.tsx 최상위 onPointerMove/Up은 버블링으로 항상 발동 확인
-  - 고스트 아이콘 위치 갱신이 끊기는 건 별도 해결 필요
-- daedalOS 참조: HTML5 DnD API 사용 (useDraggableEntries + useFileDrop)
-  - 우리는 pointer events 유지 — 러버밴드/세밀한 드롭 판정/모바일 호환성 우위
+- 드래그 중 윈도우에 `pointerEvents: 'none'` → 바탕화면 pointer 이벤트 관통
+- page.tsx `handlePointerUp`에서 `querySelectorAll('[data-drop-folder]')` + rect 판정 + zIndex 최상위 선택
+- `refreshKey={fsRevision}`으로 탐색기 창도 즉시 갱신
+- 남은 방향: 탐색기 → 바탕화면, 탐색기 → 탐색기 (탐색기 아이콘에 드래그 추가 필요)
 
 ## 앱 로드맵
 

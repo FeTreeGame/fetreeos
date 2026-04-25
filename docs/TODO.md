@@ -99,6 +99,29 @@
 - [ ] 구름글귀평원 (YouTube iframe + CSS 오버레이 구름 자막)
 - [ ] Supabase + Google OAuth 통합 인증 (OS 쉘 → iframe 앱 세션 전파)
 
+## 성능 과제
+
+### P1: loadFS() 반복 파싱 (fileSystem.ts)
+
+모든 FS 함수(getChildren, getNode, getPath, getDepth 등)가 호출마다 `localStorage.getItem + JSON.parse(전체 FS)`를 수행.
+- fileSystem.ts 내부에서 loadFS() 호출 14곳. 함수 간 연쇄 호출도 있음 (moveNodes → getDepth → loadFS 추가 1회)
+- FileExplorer 렌더 1회에 최소 getChildren(1) + getPath(1) = loadFS() 2회
+- 파일 수 N에 비례하는 비용이 렌더마다 반복. 현재 수십 개 수준에서는 무해하지만 100+ 시 체감 가능
+- **해결 방향**: 인메모리 캐시 도입 (write 시 invalidate). Supabase 전환 시에도 동일 패턴 적용 가능
+
+### P2: 창 드래그/리사이즈 시 전체 리렌더 (page.tsx)
+
+`handlePointerMove`에서 `setWindows(prev => prev.map(...))` — pointermove 60fps마다 windows 배열 전체 복사.
+Home 컴포넌트가 리렌더되면 모든 창 + 바탕화면(FileExplorer desktop)도 VDOM diff 대상.
+- 드래그 중인 창 1개만 변경되는데 전체 windows.map이 실행됨
+- FileExplorer(desktop)는 props 불변이면 React가 스킵하지만, 인라인 콜백이 있어 실제로는 매번 리렌더
+- **해결 방향**: (a) 개별 창을 React.memo로 분리, (b) 드래그 중 좌표를 ref로 관리 + requestAnimationFrame으로 DOM 직접 갱신, (c) CSS transform 기반 이동 (compositor 레이어)
+
+### P3~P4 (낮은 우선순위)
+
+- P3: 아이콘 드래그 중 setState 3개 동시 갱신 (iconDrag, dropTarget, selectedIds) — React 18 배칭으로 1회 합산되지만 구조적 비용
+- P4: 그리드 디버그 오버레이 cols×rows div 매 렌더 생성 — 디버그 전용이므로 낮음
+
 ## 인지된 과제
 
 - [ ] 드래그 반응성 개선 — React state→DOM 1프레임 지연이 원인 (정합성은 확인 완료). 드래그 중 래스터화 레이어 전환 등 compositor 수준 접근 필요. daedalOS 참조

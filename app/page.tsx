@@ -72,6 +72,7 @@ interface AppWindowProps {
   win: WindowState;
   isTop: boolean;
   dragging: boolean;
+  dragId: string | null;
   fsRevision: number;
   onFocus: (id: string) => void;
   onClose: (id: string) => void;
@@ -87,7 +88,7 @@ interface AppWindowProps {
 }
 
 const AppWindow = memo(function AppWindow({
-  win, isTop, dragging, fsRevision,
+  win, isTop, dragging, dragId, fsRevision,
   onFocus, onClose, onMinimize, onToggleMaximize,
   onTitlePointerDown, onResizePointerDown, onSnapRestore,
   onOpenNode, onFSChange, onNavigateBrowser, onIconDragChange,
@@ -162,7 +163,7 @@ const AppWindow = memo(function AppWindow({
         >✕</button>
       </div>
       {/* Content */}
-      <div className="flex-1 overflow-hidden" onPointerDown={() => onFocus(win.id)}>
+      <div className="flex-1 overflow-hidden" style={{ pointerEvents: dragId === win.id ? 'none' : undefined }} onPointerDown={() => onFocus(win.id)}>
         {win.app.type === 'browser' && (
           <Browser winId={win.id} browserUrl={win.browserUrl ?? ''} onNavigate={onNavigateBrowser} active={isTop} />
         )}
@@ -210,6 +211,7 @@ export default function Home() {
   const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const desktopRef = useRef<HTMLDivElement>(null);
   const [iconDragInfo, setIconDragInfo] = useState<IconDragInfo | null>(null);
   const [crossDropTarget, setCrossDropTarget] = useState<string | null>(null);
@@ -328,6 +330,7 @@ export default function Home() {
     const win = document.getElementById(`win-${id}`);
     if (!win) return;
     const rect = win.getBoundingClientRect();
+    rootRef.current?.setPointerCapture(e.pointerId);
     setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top });
   }, [focusWindow]);
 
@@ -348,12 +351,14 @@ export default function Home() {
       x: newX, y: newY,
       w: restoreW, h: restoreH,
     } : w));
+    rootRef.current?.setPointerCapture(e.pointerId);
     setDrag({ kind: 'move', id, offsetX, offsetY });
   }, []);
 
   const handleResizePointerDown = useCallback((id: string, edge: string, e: React.PointerEvent) => {
     e.stopPropagation();
     focusWindow(id);
+    rootRef.current?.setPointerCapture(e.pointerId);
     setWindows(prev => {
       const w = prev.find(win => win.id === id);
       if (!w) return prev;
@@ -459,6 +464,9 @@ export default function Home() {
         preSnapH: w.snapZone ? w.preSnapH : w.h,
       } : w));
     }
+    if (drag && rootRef.current && e.pointerId !== undefined) {
+      rootRef.current.releasePointerCapture(e.pointerId);
+    }
     setDrag(null);
     setSnapPreview(null);
   }, [drag, snapPreview, iconDragInfo, refreshDesktop, focusWindow]);
@@ -466,6 +474,7 @@ export default function Home() {
 
   return (
     <div
+      ref={rootRef}
       className="w-screen flex flex-col overflow-hidden select-none" style={{ height: '100dvh' }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -501,7 +510,8 @@ export default function Home() {
             key={win.id}
             win={win}
             isTop={win.id === focusedId}
-            dragging={!!iconDragInfo}
+            dragging={!!iconDragInfo || !!drag}
+            dragId={drag?.id ?? null}
             fsRevision={fsRevision}
             onFocus={focusWindow}
             onClose={closeWindow}

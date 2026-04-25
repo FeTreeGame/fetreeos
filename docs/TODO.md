@@ -215,7 +215,7 @@ P2(b)(c)는 드래그 체감이 실제로 문제될 때 — 스냅/리사이즈 
 - [ ] 바탕화면 새 파일/폴더 생성 위치 — 현재 2번째 인덱스부터 생성됨, 배열 끝(빈 셀 순서)에 생성되어야 함
 - [ ] 탐색기 폴더 진입 시 '빈 폴더입니다' 플리커 — 파일이 있는 폴더를 열 때 빈 폴더 메시지가 순간 표시된 후 내용이 로드됨 (초기 items=[] 상태에서 렌더 → getChildren 완료 후 갱신)
 - [ ] Hydration mismatch — Settings에서 그리드 해제 후 새로고침 시 발생. showGrid/autoArrange 등 localStorage 초기값이 서버/클라이언트 불일치. useEffect 지연 초기화 필요
-- [ ] 창 드래그 중 iframe에 마우스 진입 시 드래그 끊김 — 지연으로 창이 따라오기 전에 커서가 iframe 위에 도달하면 pointer 이벤트를 iframe이 먹음. 드래그 상태일 때 iframe에 pointerEvents:'none' 적용으로 해결 가능
+- [x] 창 드래그 중 iframe에 마우스 진입 시 드래그 끊김 — setPointerCapture로 루트 요소가 모든 포인터 이벤트 독점, iframe 캡처 원천 차단
 
 ## 미착수
 

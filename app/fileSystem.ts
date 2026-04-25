@@ -37,18 +37,26 @@ export function getIconForNode(node: FSNode): string {
 }
 
 // --- localStorage 구현 (추후 Supabase로 교체) ---
+// 인메모리 캐시: loadFS()를 페이지 로드 시 1회만 파싱, 이후 캐시 히트.
+// saveFS()가 캐시를 갱신하므로 write 후 즉시 반영.
+
+let fsCache: FSNode[] | null = null;
 
 export function loadFS(): FSNode[] {
   if (typeof window === 'undefined') return [];
+  if (fsCache) return fsCache;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    fsCache = raw ? JSON.parse(raw) : [];
+    return fsCache!;
   } catch {
-    return [];
+    fsCache = [];
+    return fsCache;
   }
 }
 
 function saveFS(nodes: FSNode[]): void {
+  fsCache = nodes;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nodes));
 }
 

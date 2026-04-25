@@ -283,6 +283,52 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setSelBox(null);
   }, [iconDrag, dropTarget]);
 
+  const sortAndPlace = useCallback((compareFn: (a: { id: string } & Partial<FSNode>, b: { id: string } & Partial<FSNode>) => number) => {
+    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: '__trash__', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+    allItems.sort(compareFn);
+    const next: IconPositions = {};
+    let idx = 0;
+    for (let c = 0; c < gridSize.cols; c++) {
+      for (let r = 0; r < gridSize.rows; r++) {
+        if (idx >= allItems.length) break;
+        next[allItems[idx].id] = { col: c, row: r };
+        idx++;
+      }
+    }
+    setIconPositions(next);
+    saveIconPositions(next);
+    setContextMenu(null);
+  }, [items, gridSize]);
+
+  const sortByName = useCallback(() => {
+    sortAndPlace((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+  }, [sortAndPlace]);
+
+  const TYPE_ORDER: Record<string, number> = { app: 0, folder: 1, file: 2 };
+  const sortByType = useCallback(() => {
+    sortAndPlace((a, b) => (TYPE_ORDER[a.type ?? 'file'] ?? 2) - (TYPE_ORDER[b.type ?? 'file'] ?? 2) || (a.name ?? '').localeCompare(b.name ?? ''));
+  }, [sortAndPlace]);
+
+  const sortByDate = useCallback(() => {
+    sortAndPlace((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+  }, [sortAndPlace]);
+
+  const tidyGrid = useCallback(() => {
+    const allItems = [...items.map(n => n.id), '__trash__'];
+    const next: IconPositions = {};
+    let idx = 0;
+    for (let c = 0; c < gridSize.cols; c++) {
+      for (let r = 0; r < gridSize.rows; r++) {
+        if (idx >= allItems.length) break;
+        next[allItems[idx]] = { col: c, row: r };
+        idx++;
+      }
+    }
+    setIconPositions(next);
+    saveIconPositions(next);
+    setContextMenu(null);
+  }, [items, gridSize]);
+
   const pathLabel = currentFolder === 'desktop' ? 'Desktop' : currentFolder === 'root' ? '/' : items.length >= 0 ? currentFolder : currentFolder;
 
   return (
@@ -539,6 +585,14 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           ) : (<>
             <button onClick={handleNewFile} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 텍스트 파일</button>
             <button onClick={handleNewFolder} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">새 폴더</button>
+            {isDesktop && (<>
+              <div className="border-t border-white/10 my-0.5" />
+              <button onClick={sortByName} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">이름순 정렬</button>
+              <button onClick={sortByType} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">유형순 정렬</button>
+              <button onClick={sortByDate} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">날짜순 정렬</button>
+              <div className="border-t border-white/10 my-0.5" />
+              <button onClick={tidyGrid} className="w-full text-left px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">그리드에 맞춤</button>
+            </>)}
           </>)}
         </div>
       )}

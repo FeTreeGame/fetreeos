@@ -25,7 +25,7 @@
 
 - **자유 배치 창**: x, y, w, h 모두 0~1 비율. 렌더링 시 `${v * 100}%`로 변환.
 - **스냅 창**: `snapZone` 필드에 존 이름 저장, `SNAP_RECTS`의 CSS % 값 직접 적용.
-- **아이콘**: 컨테이너가 `inset-0`으로 바탕화면 전체 차지, `flex-wrap`으로 넘침 시 다음 열.
+- **바탕화면 아이콘**: N×M 그리드 (셀 90×90px), `ResizeObserver`로 동적 계산. 아이콘 좌표는 `fetree-icon-positions` localStorage 키에 별도 저장 (FS 데이터와 분리). 자유 배치 드래그 + 정렬 옵션 지원.
 - **최소 크기**: `minWidth`/`minHeight` px 하한으로 과소 방어.
 
 ## 파일 시스템

@@ -77,6 +77,8 @@
 - [x] 폴더 자기 자신/하위 이동 순환 방지 (moveNodes 순환 체크)
 - [x] 러버밴드 히트 판정 rect 겹침으로 통일 (바탕화면+탐색기)
 - [x] 더블클릭 실행 시 선택 해제
+- [x] 리팩터링 — useDesktopDrag/useExplorerDrag 훅 분리, ContextMenu 독립 컴포넌트, constants.ts 공유 상수
+- [x] 리팩터링 — 공유 타입 통합 (IconDragInfo, IconDragState 등), SORT_COMPARATORS 모듈 스코프화, placeOnGrid 헬퍼
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
 
 ### 크로스 드래그 드롭 — 설계 메모

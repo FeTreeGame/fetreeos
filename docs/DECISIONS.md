@@ -52,3 +52,34 @@ iframe은 배포된 앱을 별도 프로세스처럼 격리 실행하는 가장 
 
 **트레이드오프**: iframe 대상 앱이 X-Frame-Options로 임베딩을 거부할 수 있음.
 본인 프로젝트는 해당 헤더를 제거하여 해결. 추후 인증 도입 시 CSP frame-ancestors로 제한 예정.
+
+## 크로스 드래그 고스트 렌더링 분할 (2026-04-25)
+
+**결정**: 바탕화면 출발 드래그는 FileExplorer가 자체 고스트 렌더링, 탐색기 출발 드래그는 page.tsx가 렌더링.
+
+**이유**: 바탕화면 드래그는 그리드 좌표 기반 오프셋으로 고스트를 계산하므로 FileExplorer 내부에서 처리하는 게 자연스러움.
+탐색기→바탕화면 크로스 드래그는 발신 윈도우에 `pointerEvents: 'none'`이 걸리므로 page.tsx가 중재해야 함.
+`crossDragging` prop(`sourceFolder !== 'desktop'`)으로 이중 렌더링 방지.
+
+## 드래그 훅 분리 (2026-04-26)
+
+**결정**: FileExplorer의 드래그 로직을 `useDesktopDrag`(바탕화면)과 `useExplorerDrag`(탐색기) 두 훅으로 분리.
+
+**이유**: FileExplorer.tsx가 950행까지 성장하면서 바탕화면/탐색기 드래그 코드가 모드 분기로 뒤섞임.
+두 모드의 드래그는 좌표계부터 다름 (그리드 vs DOM rect). 훅으로 분리하면 각 모드의 드래그 로직을 독립적으로 수정 가능.
+`clearDragState`와 `getDragIds`는 useDesktopDrag에서 생성, useExplorerDrag에 주입하여 공유.
+
+## 공유 타입/comparator 통합 (2026-04-26)
+
+**결정**: `IconDragInfo`, `IconDragState`, `SelBoxState` 등 공유 타입과 `SORT_COMPARATORS`를 `constants.ts`로 통합.
+
+**이유**: 동일 타입이 FileExplorer, useDesktopDrag, useExplorerDrag에 각각 정의되어 있었음.
+`SORT_COMPARATORS`는 바탕화면 autoArrange, 수동 정렬, 탐색기 정렬 3곳에서 동일 로직이 반복.
+모듈 스코프로 올리면 렌더마다 객체 재생성도 제거됨.
+
+## 순환 이동 방지 — 선택적 필터링 (2026-04-25)
+
+**결정**: 폴더를 자기 자신이나 하위로 이동하려 할 때, 해당 아이템만 차단하고 나머지 선택 그룹은 정상 이동.
+
+**이유**: 다중선택 드래그에서 문제 아이템 하나 때문에 전체 이동이 실패하면 UX가 불합리함.
+Windows도 동일 동작 — 이동 불가 아이템만 제외, 나머지는 진행.

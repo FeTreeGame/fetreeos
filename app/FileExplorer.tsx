@@ -94,6 +94,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     curX: number;
     curY: number;
     active: boolean;
+    additive: boolean;
+    baseSelection: Set<string>;
   } | null>(null);
 
   const refresh = useCallback(() => {
@@ -210,12 +212,17 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
     if (!isDesktop) return;
-    if (!e.ctrlKey && !e.metaKey) setSelectedIds(new Set());
+    const isAdditive = e.ctrlKey || e.metaKey;
+    if (!isAdditive) setSelectedIds(new Set());
     const el = contentRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    setSelBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, curX: e.clientX - rect.left, curY: e.clientY - rect.top, active: false });
-  }, [isDesktop]);
+    setSelBox({
+      startX: e.clientX - rect.left, startY: e.clientY - rect.top,
+      curX: e.clientX - rect.left, curY: e.clientY - rect.top,
+      active: false, additive: isAdditive, baseSelection: new Set(isAdditive ? selectedIds : []),
+    });
+  }, [isDesktop, selectedIds]);
 
   const handleDesktopPointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDrag) {
@@ -249,14 +256,18 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const bottom = Math.max(selBox.startY, curY);
 
       const allIds = [...items.map(n => n.id), '__trash__'];
-      const hit = new Set<string>();
+      const hit = new Set<string>(selBox.additive ? selBox.baseSelection : []);
       for (const id of allIds) {
         const pos = iconPositions[id];
         if (!pos) continue;
         const cx = pos.col * CELL_W + CELL_W / 2;
         const cy = pos.row * CELL_H + CELL_H / 2;
         if (cx >= left && cx <= right && cy >= top && cy <= bottom) {
-          hit.add(id);
+          if (selBox.additive && selBox.baseSelection.has(id)) {
+            hit.delete(id);
+          } else {
+            hit.add(id);
+          }
         }
       }
       setSelectedIds(hit);

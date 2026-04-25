@@ -95,7 +95,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     curY: number;
     active: boolean;
   } | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ col: number; row: number } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ col: number; row: number; center: boolean; afterY: boolean } | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selBox, setSelBox] = useState<{
@@ -266,9 +266,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const rect = el.getBoundingClientRect();
       const col = Math.max(0, Math.min(gridSize.cols - 1, Math.floor((e.clientX - rect.left) / CELL_W)));
       const row = Math.max(0, Math.min(gridSize.rows - 1, Math.floor((e.clientY - rect.top) / CELL_H)));
+      const relX = ((e.clientX - rect.left) % CELL_W) / CELL_W;
+      const relY = ((e.clientY - rect.top) % CELL_H) / CELL_H;
+      const center = relX > 0.2 && relX < 0.8 && relY > 0.2 && relY < 0.8;
 
       setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
-      setDropTarget({ col, row });
+      setDropTarget({ col, row, center, afterY: relY >= 0.5 });
       return;
     }
 
@@ -309,30 +312,38 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       const dragOrigin = iconPositions[iconDrag.id];
       if (!dragOrigin) { setIconDrag(null); setDropTarget(null); setSelBox(null); return; }
 
-      const trashPos = iconPositions['trash'];
-      if (trashPos && dropTarget.col === trashPos.col && dropTarget.row === trashPos.row && iconDrag.id !== 'trash') {
-        const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-          ? [...selectedIds].filter(id => id !== 'trash')
-          : [iconDrag.id];
-        for (const id of movedIds) moveToTrash(id);
-        setSelectedIds(new Set());
-        setIconDrag(null);
-        setDropTarget(null);
-        setSelBox(null);
-        refresh();
-        return;
+      const targetNodeId = dropTarget.center
+        ? Object.keys(iconPositions).find(id => id !== iconDrag.id && iconPositions[id].col === dropTarget.col && iconPositions[id].row === dropTarget.row)
+        : undefined;
+      const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+        ? [...selectedIds].filter(id => id !== 'trash')
+        : [iconDrag.id];
+
+      if (targetNodeId && dropTarget.center) {
+        if (targetNodeId === 'trash') {
+          for (const id of movedIds) moveToTrash(id);
+          setSelectedIds(new Set());
+          setIconDrag(null); setDropTarget(null); setSelBox(null);
+          refresh();
+          return;
+        }
+        const targetNode = items.find(n => n.id === targetNodeId);
+        if (targetNode?.type === 'folder') {
+          for (const id of movedIds) updateNode(id, { parentId: targetNodeId });
+          setSelectedIds(new Set());
+          setIconDrag(null); setDropTarget(null); setSelBox(null);
+          refresh();
+          return;
+        }
       }
 
       if (autoArrange) {
-        const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
-          ? [...selectedIds].filter(id => id !== 'trash')
-          : [iconDrag.id];
         const movedSet = new Set(movedIds);
         const sorted = Object.entries(iconPositions)
           .sort(([, a], [, b]) => a.col - b.col || a.row - b.row)
           .map(([id]) => id);
         const rest = sorted.filter(id => !movedSet.has(id));
-        const dropIdx = dropTarget.col * gridSize.rows + dropTarget.row;
+        const dropIdx = dropTarget.col * gridSize.rows + dropTarget.row + (dropTarget.afterY ? 1 : 0);
         const insertAt = Math.min(dropIdx, rest.length);
         rest.splice(insertAt, 0, ...movedIds);
         const next: IconPositions = {};
@@ -352,14 +363,14 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
       const dc = dropTarget.col - dragOrigin.col;
       const dr = dropTarget.row - dragOrigin.row;
-      const movedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
+      const freeMovedIds = selectedIds.has(iconDrag.id) && selectedIds.size > 1
         ? [...selectedIds]
         : [iconDrag.id];
 
       setIconPositions(prev => {
         const next = { ...prev };
         const newPositions: Record<string, { col: number; row: number }> = {};
-        for (const id of movedIds) {
+        for (const id of freeMovedIds) {
           const old = prev[id];
           if (!old) continue;
           const nc = Math.max(0, Math.min(gridSize.cols - 1, old.col + dc));
@@ -367,7 +378,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           newPositions[id] = { col: nc, row: nr };
         }
 
-        const movedSet = new Set(movedIds);
+        const movedSet = new Set(freeMovedIds);
         const occupiedByMoved = new Set(Object.values(newPositions).map(p => `${p.col},${p.row}`));
         for (const [id, pos] of Object.entries(newPositions)) {
           const conflictKey = Object.keys(next).find(
@@ -483,19 +494,60 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               );
             })}
             {/* Drop target highlight */}
-            {iconDrag?.active && dropTarget && (
-              <div
-                className="absolute rounded pointer-events-none"
-                style={{
-                  left: dropTarget.col * CELL_W,
-                  top: dropTarget.row * CELL_H,
-                  width: CELL_W,
-                  height: CELL_H,
-                  background: 'rgba(100, 140, 255, 0.15)',
-                  border: '2px solid rgba(100, 140, 255, 0.4)',
-                }}
-              />
-            )}
+            {iconDrag?.active && dropTarget && (() => {
+              const targetId = Object.keys(iconPositions).find(
+                id => id !== iconDrag.id && iconPositions[id].col === dropTarget.col && iconPositions[id].row === dropTarget.row
+              );
+              const targetNode = targetId === 'trash' ? TRASH_NODE : items.find(n => n.id === targetId);
+              const isReceiver = dropTarget.center && targetNode && (targetNode.type === 'folder' || targetId === 'trash');
+              if (isReceiver) {
+                return (
+                  <div
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: dropTarget.col * CELL_W + 4,
+                      top: dropTarget.row * CELL_H + 4,
+                      width: CELL_W - 8,
+                      height: CELL_H - 8,
+                      borderRadius: 8,
+                      background: 'rgba(100, 200, 120, 0.15)',
+                      border: '2px solid rgba(100, 200, 120, 0.5)',
+                    }}
+                  />
+                );
+              }
+              if (autoArrange) {
+                const barY = dropTarget.afterY
+                  ? (dropTarget.row + 1) * CELL_H
+                  : dropTarget.row * CELL_H;
+                return (
+                  <div
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: dropTarget.col * CELL_W + 8,
+                      top: barY - 1,
+                      width: CELL_W - 16,
+                      height: 2,
+                      borderRadius: 1,
+                      background: 'rgba(100, 140, 255, 0.8)',
+                    }}
+                  />
+                );
+              }
+              return (
+                <div
+                  className="absolute rounded pointer-events-none"
+                  style={{
+                    left: dropTarget.col * CELL_W,
+                    top: dropTarget.row * CELL_H,
+                    width: CELL_W,
+                    height: CELL_H,
+                    background: 'rgba(100, 140, 255, 0.15)',
+                    border: '2px solid rgba(100, 140, 255, 0.4)',
+                  }}
+                />
+              );
+            })()}
             {[...items, TRASH_NODE].map(node => {
               const pos = iconPositions[node.id];
               if (!pos) return null;
@@ -525,7 +577,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
                     handleContextMenu(e, node);
                   }}
                 >
-                  <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : 'group-hover:bg-blue-500/10'}`} />
+                  <div className={`absolute inset-0 rounded transition-colors ${isSelected ? 'bg-blue-500/20' : !iconDrag?.active ? 'group-hover:bg-blue-500/10' : ''}`} />
                   <span className="text-3xl relative">{isTrash ? '🗑️' : getIconForNode(node)}</span>
                   {renaming === node.id ? (
                     <input

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { APPS, type AppDef } from './apps';
 import Clock from './Clock';
 import Notepad from './Notepad';
@@ -67,6 +67,142 @@ let zCounter = 1;
 type DragMode =
   | { kind: 'move'; id: string; offsetX: number; offsetY: number }
   | { kind: 'resize'; id: string; edge: string; startX: number; startY: number; startW: number; startH: number; startWX: number; startWY: number };
+
+interface AppWindowProps {
+  win: WindowState;
+  isTop: boolean;
+  dragging: boolean;
+  fsRevision: number;
+  onFocus: (id: string) => void;
+  onClose: (id: string) => void;
+  onMinimize: (id: string) => void;
+  onToggleMaximize: (id: string) => void;
+  onTitlePointerDown: (id: string, e: React.PointerEvent) => void;
+  onResizePointerDown: (id: string, edge: string, e: React.PointerEvent) => void;
+  onSnapRestore: (id: string, e: React.PointerEvent, preSnapW?: number, preSnapH?: number) => void;
+  onOpenNode: (node: FSNode) => void;
+  onFSChange: () => void;
+  onNavigateBrowser: (id: string, url: string) => void;
+  onIconDragChange: (info: IconDragInfo | null) => void;
+}
+
+const AppWindow = memo(function AppWindow({
+  win, isTop, dragging, fsRevision,
+  onFocus, onClose, onMinimize, onToggleMaximize,
+  onTitlePointerDown, onResizePointerDown, onSnapRestore,
+  onOpenNode, onFSChange, onNavigateBrowser, onIconDragChange,
+}: AppWindowProps) {
+  if (win.minimized) return null;
+  const isMax = win.maximized;
+  const snap = win.snapZone ? SNAP_RECTS[win.snapZone] : null;
+  const isSnapped = !!snap;
+  return (
+    <div
+      id={`win-${win.id}`}
+      className="absolute flex flex-col shadow-2xl"
+      style={isSnapped ? {
+        left: snap.left,
+        top: snap.top,
+        width: snap.width,
+        height: snap.height,
+        zIndex: win.zIndex,
+        border: isMax ? 'none' : '1px solid rgba(255,255,255,0.15)',
+        borderRadius: isMax ? 0 : 4,
+        overflow: 'hidden',
+        pointerEvents: dragging ? 'none' as const : undefined,
+      } : {
+        left: `${win.x * 100}%`,
+        top: `${win.y * 100}%`,
+        width: `${win.w * 100}%`,
+        height: `${win.h * 100}%`,
+        zIndex: win.zIndex,
+        border: '1px solid rgba(255,255,255,0.15)',
+        borderRadius: 8,
+        overflow: 'hidden',
+        minWidth: MIN_W_PX,
+        minHeight: MIN_H_PX,
+        pointerEvents: dragging ? 'none' as const : undefined,
+      }}
+      onPointerDown={() => onFocus(win.id)}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Title Bar */}
+      <div
+        className="h-8 flex items-center px-3 gap-2 shrink-0"
+        style={{
+          background: isTop
+            ? 'linear-gradient(180deg, #4a4a65 0%, #35354a 100%)'
+            : 'linear-gradient(180deg, #2e2e3a 0%, #22222e 100%)',
+          cursor: 'move',
+        }}
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          onFocus(win.id);
+          if (isSnapped || isMax) {
+            onSnapRestore(win.id, e, win.preSnapW, win.preSnapH);
+            return;
+          }
+          onTitlePointerDown(win.id, e);
+        }}
+        onDoubleClick={() => onToggleMaximize(win.id)}
+      >
+        <span className="text-sm">{win.app.icon}</span>
+        <span className={`text-xs flex-1 ${isTop ? 'text-white/90' : 'text-white/40'}`}>{win.app.title}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMinimize(win.id); }}
+          className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
+        >─</button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleMaximize(win.id); }}
+          className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
+        >{isMax ? '❐' : '□'}</button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(win.id); }}
+          className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-red-500/80 hover:text-white text-xs"
+        >✕</button>
+      </div>
+      {/* Content */}
+      <div className="flex-1 overflow-hidden" onPointerDown={() => onFocus(win.id)}>
+        {win.app.type === 'browser' && (
+          <Browser winId={win.id} browserUrl={win.browserUrl ?? ''} onNavigate={onNavigateBrowser} active={isTop} />
+        )}
+        {win.app.type === 'notepad' && (
+          <Notepad fileId={win.fileId} onFSChange={onFSChange} />
+        )}
+        {win.app.type === 'explorer' && (
+          <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={onOpenNode} onFSChange={onFSChange} onIconDragChange={onIconDragChange} />
+        )}
+        {win.app.type === 'settings' && (
+          <Settings onFSChange={onFSChange} />
+        )}
+        {win.app.type === 'iframe' && win.app.url && (
+          <iframe
+            src={win.app.url}
+            className="w-full h-full border-0"
+            allowFullScreen
+            style={{ pointerEvents: isTop ? 'auto' : 'none' }}
+          />
+        )}
+        {win.app.type === 'empty' && (
+          <div className="h-full bg-zinc-900 flex items-center justify-center">
+            <span className="text-zinc-500 text-sm">{win.app.title}</span>
+          </div>
+        )}
+      </div>
+      {/* Resize handles */}
+      {!isMax && !isSnapped && <>
+        <div className="absolute top-0 left-0 right-0 h-1 cursor-n-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'n', e)} />
+        <div className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize" onPointerDown={(e) => onResizePointerDown(win.id, 's', e)} />
+        <div className="absolute top-0 left-0 bottom-0 w-1 cursor-w-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'w', e)} />
+        <div className="absolute top-0 right-0 bottom-0 w-1 cursor-e-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'e', e)} />
+        <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'nw', e)} />
+        <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'ne', e)} />
+        <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'sw', e)} />
+        <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'se', e)} />
+      </>}
+    </div>
+  );
+});
 
 export default function Home() {
   const [windows, setWindows] = useState<WindowState[]>([]);
@@ -194,6 +330,26 @@ export default function Home() {
     const rect = win.getBoundingClientRect();
     setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top });
   }, [focusWindow]);
+
+  const handleSnapRestore = useCallback((id: string, e: React.PointerEvent, preSnapW?: number, preSnapH?: number) => {
+    const desktop = desktopRef.current;
+    if (!desktop) return;
+    const dr = desktop.getBoundingClientRect();
+    const restoreW = preSnapW ?? 0.4;
+    const restoreH = preSnapH ?? 0.35;
+    const cx = (e.clientX - dr.left) / dr.width;
+    const cy = (e.clientY - dr.top) / dr.height;
+    const newX = Math.max(0, Math.min(cx - restoreW / 2, 1 - restoreW));
+    const newY = Math.max(0, Math.min(cy - 16 / dr.height, 1 - restoreH));
+    const offsetX = (cx - newX) * dr.width;
+    const offsetY = e.clientY - dr.top - newY * dr.height;
+    setWindows(prev => prev.map(w => w.id === id ? {
+      ...w, snapZone: null, maximized: false,
+      x: newX, y: newY,
+      w: restoreW, h: restoreH,
+    } : w));
+    setDrag({ kind: 'move', id, offsetX, offsetY });
+  }, []);
 
   const handleResizePointerDown = useCallback((id: string, edge: string, e: React.PointerEvent) => {
     e.stopPropagation();
@@ -340,134 +496,26 @@ export default function Home() {
         </div>
 
         {/* Windows */}
-        {windows.map(win => {
-          if (win.minimized) return null;
-          const isTop = win.id === focusedId;
-          const isMax = win.maximized;
-          const snap = win.snapZone ? SNAP_RECTS[win.snapZone] : null;
-          const isSnapped = !!snap;
-          return (
-            <div
-              key={win.id}
-              id={`win-${win.id}`}
-              className="absolute flex flex-col shadow-2xl"
-              style={isSnapped ? {
-                left: snap.left,
-                top: snap.top,
-                width: snap.width,
-                height: snap.height,
-                zIndex: win.zIndex,
-                border: isMax ? 'none' : '1px solid rgba(255,255,255,0.15)',
-                borderRadius: isMax ? 0 : 4,
-                overflow: 'hidden',
-                pointerEvents: iconDragInfo ? 'none' as const : undefined,
-              } : {
-                left: `${win.x * 100}%`,
-                top: `${win.y * 100}%`,
-                width: `${win.w * 100}%`,
-                height: `${win.h * 100}%`,
-                zIndex: win.zIndex,
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 8,
-                overflow: 'hidden',
-                minWidth: MIN_W_PX,
-                minHeight: MIN_H_PX,
-                pointerEvents: iconDragInfo ? 'none' as const : undefined,
-              }}
-              onPointerDown={() => focusWindow(win.id)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Title Bar */}
-              <div
-                className="h-8 flex items-center px-3 gap-2 shrink-0"
-                style={{
-                  background: isTop
-                    ? 'linear-gradient(180deg, #4a4a65 0%, #35354a 100%)'
-                    : 'linear-gradient(180deg, #2e2e3a 0%, #22222e 100%)',
-                  cursor: 'move',
-                }}
-                onPointerDown={(e) => {
-                  if ((e.target as HTMLElement).closest('button')) return;
-                  focusWindow(win.id);
-                  if (isSnapped || isMax) {
-                    const desktop = desktopRef.current;
-                    if (!desktop) return;
-                    const dr = desktop.getBoundingClientRect();
-                    const restoreW = win.preSnapW ?? 0.4;
-                    const restoreH = win.preSnapH ?? 0.35;
-                    const cx = (e.clientX - dr.left) / dr.width;
-                    const newX = Math.max(0, Math.min(cx - restoreW / 2, 1 - restoreW));
-                    const offsetX = (cx - newX) * dr.width;
-                    const offsetY = e.clientY - dr.top;
-                    setWindows(prev => prev.map(w => w.id === win.id ? {
-                      ...w, snapZone: null, maximized: false,
-                      x: newX, y: 0,
-                      w: restoreW, h: restoreH,
-                    } : w));
-                    setDrag({ kind: 'move', id: win.id, offsetX, offsetY });
-                    return;
-                  }
-                  handleTitlePointerDown(win.id, e);
-                }}
-                onDoubleClick={() => toggleMaximize(win.id)}
-              >
-                <span className="text-sm">{win.app.icon}</span>
-                <span className={`text-xs flex-1 ${isTop ? 'text-white/90' : 'text-white/40'}`}>{win.app.title}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
-                >─</button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                  className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"
-                >{isMax ? '❐' : '□'}</button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-red-500/80 hover:text-white text-xs"
-                >✕</button>
-              </div>
-              {/* Content */}
-              <div className="flex-1 overflow-hidden" onPointerDown={() => focusWindow(win.id)}>
-                {win.app.type === 'browser' && (
-                  <Browser winId={win.id} browserUrl={win.browserUrl ?? ''} onNavigate={navigateBrowser} active={isTop} />
-                )}
-                {win.app.type === 'notepad' && (
-                  <Notepad fileId={win.fileId} onFSChange={refreshDesktop} />
-                )}
-                {win.app.type === 'explorer' && (
-                  <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} />
-                )}
-                {win.app.type === 'settings' && (
-                  <Settings onFSChange={refreshDesktop} />
-                )}
-                {win.app.type === 'iframe' && win.app.url && (
-                  <iframe
-                    src={win.app.url}
-                    className="w-full h-full border-0"
-                    allowFullScreen
-                    style={{ pointerEvents: isTop ? 'auto' : 'none' }}
-                  />
-                )}
-                {win.app.type === 'empty' && (
-                  <div className="h-full bg-zinc-900 flex items-center justify-center">
-                    <span className="text-zinc-500 text-sm">{win.app.title}</span>
-                  </div>
-                )}
-              </div>
-              {/* Resize handles */}
-              {!isMax && !isSnapped && <>
-                <div className="absolute top-0 left-0 right-0 h-1 cursor-n-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'n', e)} />
-                <div className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 's', e)} />
-                <div className="absolute top-0 left-0 bottom-0 w-1 cursor-w-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'w', e)} />
-                <div className="absolute top-0 right-0 bottom-0 w-1 cursor-e-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'e', e)} />
-                <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'nw', e)} />
-                <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'ne', e)} />
-                <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'sw', e)} />
-                <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize" onPointerDown={(e) => handleResizePointerDown(win.id, 'se', e)} />
-              </>}
-            </div>
-          );
-        })}
+        {windows.map(win => (
+          <AppWindow
+            key={win.id}
+            win={win}
+            isTop={win.id === focusedId}
+            dragging={!!iconDragInfo}
+            fsRevision={fsRevision}
+            onFocus={focusWindow}
+            onClose={closeWindow}
+            onMinimize={minimizeWindow}
+            onToggleMaximize={toggleMaximize}
+            onTitlePointerDown={handleTitlePointerDown}
+            onResizePointerDown={handleResizePointerDown}
+            onSnapRestore={handleSnapRestore}
+            onOpenNode={openNode}
+            onFSChange={refreshDesktop}
+            onNavigateBrowser={navigateBrowser}
+            onIconDragChange={setIconDragInfo}
+          />
+        ))}
 
         {/* Cross-drag ghost (only for non-desktop sources — desktop renders its own) */}
         {iconDragInfo && iconDragInfo.sourceFolder !== 'desktop' && iconDragInfo.ghosts.map((g, i) => (

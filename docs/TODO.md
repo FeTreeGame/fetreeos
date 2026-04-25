@@ -79,6 +79,9 @@
 - [x] 더블클릭 실행 시 선택 해제
 - [x] 리팩터링 — useDesktopDrag/useExplorerDrag 훅 분리, ContextMenu 독립 컴포넌트, constants.ts 공유 상수
 - [x] 리팩터링 — 공유 타입 통합 (IconDragInfo, IconDragState 등), SORT_COMPARATORS 모듈 스코프화, placeOnGrid 헬퍼
+- [x] 성능 — P1: loadFS() 인메모리 캐시 (14곳 호출 전부 캐시 히트, JSON.parse 1회로 축소)
+- [x] 성능 — P2(a): AppWindow 컴포넌트 React.memo 분리 (드래그 중 비관련 창 리렌더 차단)
+- [x] 하단 스냅 해제 시 상단 점프 버그 수정 (y: 0 하드코딩 → 커서 Y 기준 배치)
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
 
 ### 크로스 드래그 드롭 — 설계 메모
@@ -101,7 +104,7 @@
 
 ## 성능 과제
 
-### P1: loadFS() 반복 파싱 (fileSystem.ts)
+### P1: loadFS() 반복 파싱 (fileSystem.ts) — ✅ 해결 (인메모리 캐시)
 
 모든 FS 함수(getChildren, getNode, getPath, getDepth 등)가 호출마다 `localStorage.getItem + JSON.parse(전체 FS)`를 수행.
 
@@ -143,7 +146,7 @@ function saveFS(nodes: FSNode[]): void {
 
 **착수 조건**: 기능 추가 없이 fileSystem.ts 내부만 수정. 외부 API 변경 없음. 지금 바로 가능.
 
-### P2: 창 드래그/리사이즈 시 전체 리렌더 (page.tsx)
+### P2: 창 드래그/리사이즈 시 전체 리렌더 (page.tsx) — (a) 완료
 
 `handlePointerMove`에서 `setWindows(prev => prev.map(...))` — pointermove 60fps마다 windows 배열 전체 복사.
 Home 컴포넌트가 리렌더되면 모든 창 + 바탕화면(FileExplorer desktop)도 VDOM diff 대상.
@@ -166,7 +169,7 @@ TODO '드래그 반응성 개선 — React state→DOM 1프레임 지연'의 근
 
 **해결 방향 3단계 (비용↔효과 순):**
 
-**(a) React.memo + Window 컴포넌트 분리 — 지금 바로 가능**
+**(a) React.memo + Window 컴포넌트 분리 — ✅ 완료**
 
 page.tsx의 `windows.map` 내부 JSX를 `React.memo(Window)` 컴포넌트로 추출.
 props가 안 바뀐 창은 리렌더 스킵. 인라인 콜백(`() => focusWindow(win.id)` 등)을

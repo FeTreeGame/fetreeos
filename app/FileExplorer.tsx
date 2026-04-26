@@ -101,18 +101,18 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const contentRef = useRef<HTMLDivElement>(null);
   const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
   const [iconPositions, setIconPositions] = useState<IconPositions>({});
-  const [showGrid, setShowGrid] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('fetree-show-grid') !== 'false';
-  });
-  const [autoArrange, setAutoArrange] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('fetree-auto-arrange') === 'true';
-  });
-  const [desktopSort, setDesktopSort] = useState<SortKey>(() => {
-    if (typeof window === 'undefined') return 'type';
-    return (localStorage.getItem('fetree-desktop-sort') as SortKey) || 'type';
-  });
+  const [showGrid, setShowGrid] = useState(true);
+  const [autoArrange, setAutoArrange] = useState(false);
+  const [desktopSort, setDesktopSort] = useState<SortKey>('type');
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
+    setAutoArrange(localStorage.getItem('fetree-auto-arrange') === 'true');
+    setDesktopSort((localStorage.getItem('fetree-desktop-sort') as SortKey) || 'type');
+    setItems(getChildren(initialFolderId));
+    setHydrated(true);
+  }, [initialFolderId]);
   const [explorerSort, setExplorerSort] = useState<SortKey | null>(null);
 
   const [iconDrag, setIconDrag] = useState<IconDragState>(null);
@@ -359,7 +359,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         onPointerMove={isDesktop ? handleDesktopPointerMove : handleExplorerPointerMove}
         onPointerUp={isDesktop ? (e) => handleDesktopPointerUp(e) : handleExplorerPointerUp}
       >
-        {items.length === 0 && !isDesktop ? (
+        {items.length === 0 && !isDesktop && hydrated ? (
           <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
         ) : isDesktop ? (
           <div className="relative w-full h-full">

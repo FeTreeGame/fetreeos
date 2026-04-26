@@ -213,8 +213,8 @@ P2(b)(c)는 드래그 체감이 실제로 문제될 때 — 스냅/리사이즈 
 - [ ] 드래그 반응성 개선 — React state→DOM 1프레임 지연이 원인 (정합성은 확인 완료). 드래그 중 래스터화 레이어 전환 등 compositor 수준 접근 필요. daedalOS 참조
 - [x] 메모장 새 파일 생성 시 3중 생성 버그 — initialized ref 가드 + onFSChange 호출로 해결
 - [x] 바탕화면 새 파일/폴더 생성 위치 — 명시적 새로고침 모델 도입으로 해결
-- [ ] 탐색기 폴더 진입 시 '빈 폴더입니다' 플리커 — 파일이 있는 폴더를 열 때 빈 폴더 메시지가 순간 표시된 후 내용이 로드됨 (초기 items=[] 상태에서 렌더 → getChildren 완료 후 갱신)
-- [ ] Hydration mismatch — Settings에서 그리드 해제 후 새로고침 시 발생. showGrid/autoArrange 등 localStorage 초기값이 서버/클라이언트 불일치. useEffect 지연 초기화 필요
+- [x] 탐색기 폴더 진입 시 '빈 폴더입니다' 플리커 — hydration useEffect에서 items 동기 로드 + hydrated 플래그로 빈 폴더 메시지 지연 표시
+- [x] Hydration mismatch — useState(() => localStorage...) 패턴 전면 제거. SSR 기본값 + useEffect 지연 초기화로 통일 (FileExplorer 3곳, Settings 1곳)
 - [x] 창 드래그 중 iframe에 마우스 진입 시 드래그 끊김 — setPointerCapture로 루트 요소가 모든 포인터 이벤트 독점, iframe 캡처 원천 차단
 - [x] 메모장 최초 실행 시 파일 2중 생성 — StrictMode 이중 useEffect 방어(initialized ref) + onFSChange 누락 수정
 - [x] 바탕화면 새 파일/폴더 생성 위치 — useEffect에서 sort 분리, 명시적 새로고침 모델 도입. 새 파일은 항상 끝에 배치

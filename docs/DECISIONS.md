@@ -89,6 +89,15 @@ iframe은 배포된 앱을 별도 프로세스처럼 격리 실행하는 가장 
 **트레이드오프**: autoArrange ON이지만 정렬이 깨진 상태가 존재할 수 있음 (파일 생성/삭제 후).
 사용자가 "새로고침"이나 정렬 메뉴로 명시적으로 재정렬해야 함. 이것이 Windows의 실제 동작.
 
+## Hydration 안전 초기화 패턴 (2026-04-26)
+
+**결정**: `useState(() => localStorage...)` 패턴을 전면 제거. SSR 기본값으로 초기화 후 useEffect에서 localStorage 적용.
+
+**이유**: `'use client'` 컴포넌트도 Next.js에서 서버 프리렌더를 거침. lazy initializer가 SSR에서 기본값, 클라이언트에서 localStorage 값을 반환하면 hydration mismatch 발생.
+useEffect 지연 초기화로 통일하면 SSR/클라이언트 초기값이 항상 일치하고, Supabase 전환 시에도 useEffect 내부만 비동기로 교체하면 됨.
+
+**트레이드오프**: 첫 렌더에서 1프레임 동안 기본값이 보일 수 있음 (e.g. 그리드 ON→OFF 설정인 경우 잠깐 그리드 표시). `hydrated` 플래그로 필요 시 조건부 렌더링 가능.
+
 ## 순환 이동 방지 — 선택적 필터링 (2026-04-25)
 
 **결정**: 폴더를 자기 자신이나 하위로 이동하려 할 때, 해당 아이템만 차단하고 나머지 선택 그룹은 정상 이동.

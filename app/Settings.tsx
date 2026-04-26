@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { initDefaultFS } from './fileSystem';
 
 const ICON_POS_KEY = 'fetree-icon-positions';
@@ -10,10 +10,11 @@ interface SettingsProps {
 }
 
 export default function Settings({ onFSChange }: SettingsProps) {
-  const [showGrid, setShowGrid] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('fetree-show-grid') !== 'false';
-  });
+  const [showGrid, setShowGrid] = useState(true);
+
+  useEffect(() => {
+    setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
+  }, []);
 
   const handleResetIcons = () => {
     localStorage.removeItem(ICON_POS_KEY);

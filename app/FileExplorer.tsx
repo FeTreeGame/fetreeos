@@ -150,34 +150,42 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     return () => ro.disconnect();
   }, [isDesktop]);
 
+  const allDesktopItems = useCallback((): ({ id: string } & Partial<FSNode>)[] => {
+    return [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+  }, [items]);
+
+  const applyLayout = useCallback((positions: IconPositions) => {
+    setIconPositions(positions);
+    saveIconPositions(positions);
+  }, []);
+
+  const compactLayout = useCallback(() => {
+    const all = allDesktopItems();
+    const saved = loadIconPositions();
+    const { cols, rows } = gridSize;
+    const withPos: { id: string; idx: number }[] = [];
+    const tail: { id: string }[] = [];
+    for (const item of all) {
+      const pos = saved[item.id];
+      if (pos) {
+        withPos.push({ id: item.id, idx: pos.col * rows + pos.row });
+      } else {
+        tail.push(item);
+      }
+    }
+    withPos.sort((a, b) => a.idx - b.idx);
+    applyLayout(placeOnGrid([...withPos, ...tail], cols, rows));
+  }, [allDesktopItems, gridSize, applyLayout]);
+
   useEffect(() => {
     if (!isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
-    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
-    const saved = loadIconPositions();
-
     if (autoArrange) {
-      const { cols, rows } = gridSize;
-      const withPos: { id: string; idx: number }[] = [];
-      const newItems: { id: string }[] = [];
-      for (const item of allItems) {
-        const pos = saved[item.id];
-        if (pos) {
-          withPos.push({ id: item.id, idx: pos.col * rows + pos.row });
-        } else {
-          newItems.push(item);
-        }
-      }
-      withPos.sort((a, b) => a.idx - b.idx);
-      const ordered = [...withPos, ...newItems];
-      const next = placeOnGrid(ordered, cols, rows);
-      setIconPositions(next);
-      saveIconPositions(next);
+      compactLayout();
     } else {
-      const placed = autoPlace(allItems, saved, gridSize.cols, gridSize.rows);
-      setIconPositions(placed);
-      saveIconPositions(placed);
+      const placed = autoPlace(allDesktopItems(), loadIconPositions(), gridSize.cols, gridSize.rows);
+      applyLayout(placed);
     }
-  }, [isDesktop, items, gridSize, autoArrange]);
+  }, [isDesktop, items, gridSize, autoArrange, allDesktopItems, compactLayout, applyLayout]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);
@@ -291,26 +299,17 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     currentFolder, onIconDragChange, clearDragState, getDragIds,
   });
 
-  const applyDesktopSort = useCallback((key: SortKey) => {
-    setDesktopSort(key);
-    localStorage.setItem('fetree-desktop-sort', key);
-    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
-    allItems.sort(SORT_COMPARATORS[key]);
-    const next = placeOnGrid(allItems, gridSize.cols, gridSize.rows);
-    setIconPositions(next);
-    saveIconPositions(next);
+  const sortLayout = useCallback((key?: SortKey) => {
+    const sortKey = key ?? desktopSort;
+    if (key) {
+      setDesktopSort(key);
+      localStorage.setItem('fetree-desktop-sort', key);
+    }
+    const all = allDesktopItems();
+    all.sort(SORT_COMPARATORS[sortKey]);
+    applyLayout(placeOnGrid(all, gridSize.cols, gridSize.rows));
     setContextMenu(null);
-  }, [items, gridSize]);
-
-  const refreshDesktopLayout = useCallback(() => {
-    if (!autoArrange) return;
-    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
-    allItems.sort(SORT_COMPARATORS[desktopSort]);
-    const next = placeOnGrid(allItems, gridSize.cols, gridSize.rows);
-    setIconPositions(next);
-    saveIconPositions(next);
-    setContextMenu(null);
-  }, [autoArrange, items, gridSize, desktopSort]);
+  }, [desktopSort, allDesktopItems, gridSize, applyLayout]);
 
   const breadcrumb = getPath(currentFolder);
 
@@ -603,12 +602,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             const next = !autoArrange;
             setAutoArrange(next);
             localStorage.setItem('fetree-auto-arrange', String(next));
-            if (next) applyDesktopSort(desktopSort);
+            if (next) sortLayout();
             setContextMenu(null);
           }}
-          onDesktopSort={(key) => applyDesktopSort(key)}
+          onDesktopSort={(key) => sortLayout(key)}
           onExplorerSort={(key) => { setExplorerSort(explorerSort === key ? null : key); setContextMenu(null); }}
-          onRefresh={refreshDesktopLayout}
+          onRefresh={() => sortLayout()}
           onSubMenu={setSubMenu}
         />
       )}

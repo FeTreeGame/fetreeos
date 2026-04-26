@@ -29,6 +29,7 @@ function autoPlace(
 ): IconPositions {
   const result: IconPositions = {};
   const occupied = new Set<string>();
+  const unplaced: { id: string }[] = [];
 
   for (const item of items) {
     const pos = existing[item.id];
@@ -40,9 +41,29 @@ function autoPlace(
         continue;
       }
     }
+    unplaced.push(item);
+  }
+  let startIdx = 0;
+  for (const pos of Object.values(result)) {
+    const idx = pos.col * rows + pos.row + 1;
+    if (idx > startIdx) startIdx = idx;
+  }
+  for (const item of unplaced) {
     let placed = false;
-    for (let c = 0; c < cols && !placed; c++) {
-      for (let r = 0; r < rows && !placed; r++) {
+    for (let i = startIdx; i < cols * rows && !placed; i++) {
+      const c = Math.floor(i / rows);
+      const r = i % rows;
+      const key = `${c},${r}`;
+      if (!occupied.has(key)) {
+        result[item.id] = { col: c, row: r };
+        occupied.add(key);
+        placed = true;
+      }
+    }
+    if (!placed) {
+      for (let i = 0; i < startIdx && !placed; i++) {
+        const c = Math.floor(i / rows);
+        const r = i % rows;
         const key = `${c},${r}`;
         if (!occupied.has(key)) {
           result[item.id] = { col: c, row: r };
@@ -132,18 +153,31 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   useEffect(() => {
     if (!isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
     const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+    const saved = loadIconPositions();
+
     if (autoArrange) {
-      allItems.sort(SORT_COMPARATORS[desktopSort]);
-      const next = placeOnGrid(allItems, gridSize.cols, gridSize.rows);
+      const { cols, rows } = gridSize;
+      const withPos: { id: string; idx: number }[] = [];
+      const newItems: { id: string }[] = [];
+      for (const item of allItems) {
+        const pos = saved[item.id];
+        if (pos) {
+          withPos.push({ id: item.id, idx: pos.col * rows + pos.row });
+        } else {
+          newItems.push(item);
+        }
+      }
+      withPos.sort((a, b) => a.idx - b.idx);
+      const ordered = [...withPos, ...newItems];
+      const next = placeOnGrid(ordered, cols, rows);
       setIconPositions(next);
       saveIconPositions(next);
     } else {
-      const saved = loadIconPositions();
       const placed = autoPlace(allItems, saved, gridSize.cols, gridSize.rows);
       setIconPositions(placed);
       saveIconPositions(placed);
     }
-  }, [isDesktop, items, gridSize, autoArrange, desktopSort]);
+  }, [isDesktop, items, gridSize, autoArrange]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);
@@ -267,6 +301,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     saveIconPositions(next);
     setContextMenu(null);
   }, [items, gridSize]);
+
+  const refreshDesktopLayout = useCallback(() => {
+    if (!autoArrange) return;
+    const allItems: ({ id: string } & Partial<FSNode>)[] = [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+    allItems.sort(SORT_COMPARATORS[desktopSort]);
+    const next = placeOnGrid(allItems, gridSize.cols, gridSize.rows);
+    setIconPositions(next);
+    saveIconPositions(next);
+    setContextMenu(null);
+  }, [autoArrange, items, gridSize, desktopSort]);
 
   const breadcrumb = getPath(currentFolder);
 
@@ -559,10 +603,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             const next = !autoArrange;
             setAutoArrange(next);
             localStorage.setItem('fetree-auto-arrange', String(next));
+            if (next) applyDesktopSort(desktopSort);
             setContextMenu(null);
           }}
           onDesktopSort={(key) => applyDesktopSort(key)}
           onExplorerSort={(key) => { setExplorerSort(explorerSort === key ? null : key); setContextMenu(null); }}
+          onRefresh={refreshDesktopLayout}
           onSubMenu={setSubMenu}
         />
       )}

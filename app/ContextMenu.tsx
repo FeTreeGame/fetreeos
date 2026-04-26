@@ -25,6 +25,7 @@ interface ContextMenuProps {
   onToggleAutoArrange: () => void;
   onDesktopSort: (key: SortKey) => void;
   onExplorerSort: (key: SortKey) => void;
+  onRefresh: () => void;
   onSubMenu: (menu: 'create' | 'sort' | null) => void;
 }
 
@@ -35,7 +36,7 @@ export default function ContextMenu({
   autoArrange, desktopSort, explorerSort, subMenu,
   onClose, onOpen, onDelete, onPermanentDelete, onRestore, onRename,
   onNewFile, onNewFolder, onEmptyTrash,
-  onToggleAutoArrange, onDesktopSort, onExplorerSort, onSubMenu,
+  onToggleAutoArrange, onDesktopSort, onExplorerSort, onRefresh, onSubMenu,
 }: ContextMenuProps) {
   const menuStyle = {
     left: x, top: y,
@@ -118,6 +119,7 @@ export default function ContextMenu({
           </button>
           {subMenu === 'sort' && sortSub(desktopSort, onDesktopSort)}
         </div>
+        <button onClick={onRefresh} className={btn}>새로고침</button>
       </>) : (
         <div className="relative" onMouseEnter={() => onSubMenu('sort')} onMouseLeave={() => onSubMenu(null)}>
           <button className={`${btn} flex justify-between items-center`}>

@@ -26,23 +26,23 @@
 
 ```
 app/
-├── page.tsx              (557행)  윈도우 매니저 + 크로스 드래그 조정
-├── FileExplorer.tsx      (578행)  바탕화면/탐색기 통합 컴포넌트
-├── useDesktopDrag.ts     (220행)  바탕화면 드래그 드롭 로직 (훅)
+├── page.tsx              (615행)  윈도우 매니저 + 크로스 드래그 조정
+├── FileExplorer.tsx      (623행)  바탕화면/탐색기 통합 컴포넌트
+├── useDesktopDrag.ts     (211행)  바탕화면 드래그 드롭 로직 (훅)
 ├── useExplorerDrag.ts     (87행)  탐색기 드래그 드롭 로직 (훅)
-├── ContextMenu.tsx       (131행)  우클릭 메뉴 (바탕화면/탐색기/휴지통 분기, 서브메뉴)
+├── ContextMenu.tsx       (133행)  우클릭 메뉴 (바탕화면/탐색기/휴지통 분기, 서브메뉴)
 ├── constants.ts           (75행)  공유 상수 + 타입 + 정렬 comparator + 배치 헬퍼
-├── fileSystem.ts         (312행)  가상 FS (localStorage, moveNodes, 순환 방지)
+├── fileSystem.ts         (320행)  가상 FS (localStorage + 인메모리 캐시, moveNodes, 순환 방지)
 ├── apps.ts                (25행)  앱 정의 (AppDef + APPS 배열)
 ├── Browser.tsx            (81행)  브라우저 앱
 ├── Clock.tsx              (85행)  시계 + 캘린더 팝업
-├── Notepad.tsx           (147행)  메모장 앱 (FSNode 연동)
+├── Notepad.tsx           (152행)  메모장 앱 (FSNode 연동)
 ├── Settings.tsx          (112행)  제어판 앱
 ├── noteStore.ts           (33행)  메모장 상태 스토어
 ├── sampleNotes.ts         (40행)  샘플 메모 데이터
 └── layout.tsx             (34행)  루트 레이아웃
                          ───────
-                         2,517행 합계
+                         2,626행 합계
 ```
 
 ## 좌표계
@@ -131,7 +131,7 @@ Windows explorer.exe 구조. 단일 컴포넌트가 두 가지 모드로 동작:
 
 ### ContextMenu.tsx — 우클릭 메뉴
 
-상황별 메뉴 분기: 휴지통 배경, 휴지통 아이템, 일반 파일/폴더/앱, 바탕화면 배경(서브메뉴: 새로 만들기, 정렬 기준), 탐색기 배경.
+상황별 메뉴 분기: 휴지통 배경, 휴지통 아이템, 일반 파일/폴더/앱, 바탕화면 배경(서브메뉴: 새로 만들기, 정렬 기준 + 자동 정렬 토글 + 새로고침), 탐색기 배경.
 
 ### 기타
 
@@ -139,6 +139,45 @@ Windows explorer.exe 구조. 단일 컴포넌트가 두 가지 모드로 동작:
 - `Notepad.tsx` — 파일 기반 텍스트 편집기
 - `Settings.tsx` — 제어판 (그리드 토글 -> FileExplorer 연동, initDefaultFS 재초기화)
 - `Browser.tsx` — 주소창 + 게임 목록 + iframe
+
+## 아이콘 배치 모델
+
+바탕화면 아이콘 위치를 결정하는 로직. 본질적으로 **3경로**:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  이벤트 발생                                              │
+│                                                         │
+│  items 변경 (생성/삭제/이동/크로스드래그/리사이즈)            │
+│    └→ useEffect → 배치(place)                            │
+│         ├ autoArrange ON → compactLayout()               │
+│         │  기존 순서 유지, 갭 압축, 새 아이템 끝            │
+│         └ autoArrange OFF → autoPlace()                  │
+│            저장 위치 유지, 새 아이템 빈 칸에                │
+│                                                         │
+│  명시적 사용자 행위 (5가지 트리거)                          │
+│    └→ 정렬(sort) → sortLayout(key?)                      │
+│         전체를 정렬 기준으로 재배치                         │
+│         ① 자동정렬 토글 ON                                │
+│         ② 정렬 > 이름순                                   │
+│         ③ 정렬 > 유형순                                   │
+│         ④ 정렬 > 날짜순                                   │
+│         ⑤ 새로고침                                        │
+│                                                         │
+│  데스크톱 내 드래그 드롭                                    │
+│    └→ 직접 이동(drag) → useDesktopDrag pointerUp          │
+│         ├ autoArrange ON → 끼워넣기 (placeOnGrid)         │
+│         └ autoArrange OFF → 좌표 오프셋 이동 + 충돌 교환   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**핵심 원칙**: useEffect는 정렬하지 않는다. items가 바뀌면 기존 순서/위치를 존중하고 새 아이템만 끝에 배치. 정렬은 사용자가 명시적으로 요청할 때만 발생.
+
+**공통 헬퍼**:
+- `allDesktopItems()` — items + 휴지통 가상 노드 구성
+- `applyLayout(positions)` — setIconPositions + saveIconPositions 통합
+- `placeOnGrid(items, cols, rows)` — 정렬된 아이템을 col→row 순으로 연속 배치 (constants.ts)
+- `autoPlace(items, existing, cols, rows)` — 저장 위치 유지, 미배치 아이템은 마지막 점유 셀 이후 빈 칸에
 
 ## 드래그 드롭 아키텍처
 

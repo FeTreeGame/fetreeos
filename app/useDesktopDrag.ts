@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { getIconForNode, moveNodes, type FSNode } from './fileSystem';
-import { CELL_W, CELL_H, TRASH_NODE, type IconDragInfo, type IconPositions, type IconDragState, type SelBoxState, type DropTargetState } from './constants';
+import { CELL_W, CELL_H, TRASH_NODE, placeOnGrid, type IconDragInfo, type IconPositions, type IconDragState, type SelBoxState, type DropTargetState } from './constants';
 
 interface UseDesktopDragParams {
   contentRef: React.RefObject<HTMLDivElement | null>;
@@ -158,15 +158,7 @@ export function useDesktopDrag({
         const dropIdx = dropTarget.col * gridSize.rows + dropTarget.row + (dropTarget.afterY ? 1 : 0);
         const insertAt = Math.min(dropIdx, rest.length);
         rest.splice(insertAt, 0, ...movedIds);
-        const next: IconPositions = {};
-        let idx = 0;
-        for (let c = 0; c < gridSize.cols; c++) {
-          for (let r = 0; r < gridSize.rows; r++) {
-            if (idx >= rest.length) break;
-            next[rest[idx]] = { col: c, row: r };
-            idx++;
-          }
-        }
+        const next = placeOnGrid(rest.map(id => ({ id })), gridSize.cols, gridSize.rows);
         setIconPositions(next);
         saveIconPositions(next);
         clearDragState();
@@ -177,35 +169,34 @@ export function useDesktopDrag({
       const dr = dropTarget.row - dragOrigin.row;
       const freeMovedIds = getDragIds(iconDrag.id);
 
-      setIconPositions(prev => {
-        const next = { ...prev };
-        const newPositions: Record<string, { col: number; row: number }> = {};
-        for (const id of freeMovedIds) {
-          const old = prev[id];
-          if (!old) continue;
-          const nc = Math.max(0, Math.min(gridSize.cols - 1, old.col + dc));
-          const nr = Math.max(0, Math.min(gridSize.rows - 1, old.row + dr));
-          newPositions[id] = { col: nc, row: nr };
-        }
+      const next = { ...iconPositions };
+      const newPositions: Record<string, { col: number; row: number }> = {};
+      for (const id of freeMovedIds) {
+        const old = iconPositions[id];
+        if (!old) continue;
+        newPositions[id] = {
+          col: Math.max(0, Math.min(gridSize.cols - 1, old.col + dc)),
+          row: Math.max(0, Math.min(gridSize.rows - 1, old.row + dr)),
+        };
+      }
 
-        const movedSet = new Set(freeMovedIds);
-        const occupiedByMoved = new Set(Object.values(newPositions).map(p => `${p.col},${p.row}`));
-        for (const [id, pos] of Object.entries(newPositions)) {
-          const conflictKey = Object.keys(next).find(
-            k => !movedSet.has(k) && next[k].col === pos.col && next[k].row === pos.row
-          );
-          if (conflictKey) {
-            const origPos = prev[id];
-            if (origPos && !occupiedByMoved.has(`${origPos.col},${origPos.row}`)) {
-              next[conflictKey] = { ...origPos };
-            }
+      const movedSet = new Set(freeMovedIds);
+      const occupiedByMoved = new Set(Object.values(newPositions).map(p => `${p.col},${p.row}`));
+      for (const [id, pos] of Object.entries(newPositions)) {
+        const conflictKey = Object.keys(next).find(
+          k => !movedSet.has(k) && next[k].col === pos.col && next[k].row === pos.row
+        );
+        if (conflictKey) {
+          const origPos = iconPositions[id];
+          if (origPos && !occupiedByMoved.has(`${origPos.col},${origPos.row}`)) {
+            next[conflictKey] = { ...origPos };
           }
-          next[id] = pos;
         }
+        next[id] = pos;
+      }
 
-        saveIconPositions(next);
-        return next;
-      });
+      setIconPositions(next);
+      saveIconPositions(next);
     }
     onIconDragChange?.(null);
     clearDragState();

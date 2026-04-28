@@ -13,30 +13,24 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
   const [title, setTitle] = useState('새 메모.txt');
   const [currentFileId, setCurrentFileId] = useState<string | null>(fileId ?? null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [openDialog, setOpenDialog] = useState(false);
   const [txtFiles, setTxtFiles] = useState<FSNode[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
 
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
     if (fileId) {
       const node = getNode(fileId);
       if (node) {
         setCurrentFileId(node.id);
         setTitle(node.name);
         setContent(node.content ?? '');
-        initialized.current = true;
-        return;
       }
     }
-    if (initialized.current) return;
-    initialized.current = true;
-    const node = createFile('desktop', '새 메모.txt', '');
-    setCurrentFileId(node.id);
-    setTitle(node.name);
-    setContent('');
-    onFSChange?.();
-  }, [fileId, onFSChange]);
+  }, [fileId]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -47,20 +41,27 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
     return () => document.removeEventListener('pointerdown', handler);
   }, [menuOpen]);
 
-  const handleSave = useCallback(() => {
-    if (!currentFileId) return;
-    updateNode(currentFileId, { content, name: title });
+  const handleAutoSave = useCallback(() => {
+    if (currentFileId) updateNode(currentFileId, { content, name: title });
   }, [currentFileId, content, title]);
+
+  const handleSave = useCallback(() => {
+    if (currentFileId) {
+      updateNode(currentFileId, { content, name: title });
+    } else {
+      const node = createFile('desktop', title, content);
+      setCurrentFileId(node.id);
+      onFSChange?.();
+    }
+  }, [currentFileId, content, title, onFSChange]);
 
   const handleNew = useCallback(() => {
     if (currentFileId) updateNode(currentFileId, { content, name: title });
-    const node = createFile('desktop', '새 메모.txt', '');
-    setCurrentFileId(node.id);
-    setTitle(node.name);
+    setCurrentFileId(null);
+    setTitle('새 메모.txt');
     setContent('');
     setMenuOpen(null);
-    onFSChange?.();
-  }, [currentFileId, content, title, onFSChange]);
+  }, [currentFileId, content, title]);
 
   const showOpenDialog = useCallback(() => {
     if (currentFileId) updateNode(currentFileId, { content, name: title });
@@ -78,7 +79,7 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
 
   return (
     <div className="flex flex-col h-full relative">
-      <div ref={menuRef} className="flex items-center gap-1 px-2 py-1 bg-zinc-800 border-b border-zinc-700 text-xs text-zinc-400">
+      <div ref={menuRef} className={`flex items-center gap-1 px-2 py-1 border-b text-xs ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-400' : 'bg-zinc-200 border-zinc-300 text-zinc-600'}`}>
         <div className="relative">
           <span
             className={`px-1 cursor-default ${menuOpen === 'file' ? 'text-white bg-white/10 rounded' : 'hover:text-white'}`}
@@ -96,24 +97,41 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
           )}
         </div>
         <span className="hover:text-white cursor-default px-1">Edit</span>
-        <span className="hover:text-white cursor-default px-1">Format</span>
+        <div className="relative">
+          <span
+            className={`px-1 cursor-default ${menuOpen === 'theme' ? 'text-white bg-white/10 rounded' : 'hover:text-white'}`}
+            onClick={() => setMenuOpen(v => v === 'theme' ? null : 'theme')}
+          >Theme</span>
+          {menuOpen === 'theme' && (
+            <div
+              className="absolute top-full left-0 mt-0.5 w-40 rounded shadow-xl overflow-hidden"
+              style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.12)', zIndex: 100 }}
+            >
+              <button onClick={() => { setTheme('dark'); setMenuOpen(null); }} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 ${theme === 'dark' ? 'text-white' : 'text-white/50'}`}>
+                {theme === 'dark' ? '● ' : '○ '}Dark
+              </button>
+              <button onClick={() => { setTheme('light'); setMenuOpen(null); }} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 ${theme === 'light' ? 'text-white' : 'text-white/50'}`}>
+                {theme === 'light' ? '● ' : '○ '}Light
+              </button>
+            </div>
+          )}
+        </div>
         <div className="flex-1" />
-        <button onClick={handleSave} className="px-1.5 py-0.5 rounded text-[10px] text-white/40 hover:text-white/70 hover:bg-white/10">Save</button>
       </div>
-      <div className="flex items-center px-3 py-1 border-b border-zinc-700" style={{ background: '#1e1e2a' }}>
+      <div className={`flex items-center px-3 py-1 border-b ${theme === 'dark' ? 'border-zinc-700' : 'border-zinc-300'}`} style={{ background: theme === 'dark' ? '#1e1e2a' : '#f0f0f0' }}>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onBlur={handleSave}
-          className="flex-1 bg-transparent text-xs text-white/70 outline-none"
+          onBlur={handleAutoSave}
+          className={`flex-1 bg-transparent text-xs outline-none ${theme === 'dark' ? 'text-white/70' : 'text-zinc-800'}`}
           placeholder="제목 없음"
         />
       </div>
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        onBlur={handleSave}
-        className="flex-1 bg-zinc-950 text-zinc-300 text-xs p-3 outline-none resize-none font-mono leading-relaxed"
+        onBlur={handleAutoSave}
+        className={`flex-1 text-xs p-3 outline-none resize-none font-mono leading-relaxed ${theme === 'dark' ? 'bg-zinc-950 text-zinc-300' : 'bg-white text-zinc-900'}`}
         spellCheck={false}
       />
 

@@ -18,8 +18,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - My Computer app — OS 정보, localStorage 용량 모니터링, 브라우저 정보
 - system 노드 타입 — Settings, 휴지통을 시스템 아이콘으로 분류 (정렬 최상위)
 - APP_VERSION 환경변수 — package.json version을 빌드 시 주입
+- Notepad 테마 전환 — Theme 탭으로 Dark/Light 선택 (기본 Light)
 
 ### Changed
+- Notepad 파일 생성 지연 — 열기 시 메모리만 사용, Save 시에만 파일 생성
 - Branding: FeTreeGame → FeTreeOS (package.json, layout, meta tags, welcome file)
 - OG meta tags added for link sharing
 - 정렬 우선순위: system(0) → app(1) → folder(2) → file(3)

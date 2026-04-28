@@ -8,7 +8,7 @@
 - [x] package.json — name → "fetreeos", version 0.1.0 확인
 - [x] layout.tsx — `<title>`, `<meta>` 태그에 FeTreeOS 반영
 - [x] OG 메타태그 — title, description, siteName 추가 (이미지는 로고 확정 후)
-- [ ] favicon — FeTreeOS 로고 또는 임시 아이콘
+- [x] favicon — ICO 32x32 (~2.7KB) 적용. 향후 SVG 전환 + ICO 빌드 생성 예정 (TODO.md 에셋 최적화 철학 참조)
 - [x] 바탕화면 환영 파일 — "FeTree OS" → "FeTreeOS" 명칭 통일
 - [x] games/[slug]/page.tsx — "FeTreeGame" → "FeTreeOS" 반영
 - [ ] Vercel 프로젝트명 결정 (fetreeos → fetreeos.vercel.app)

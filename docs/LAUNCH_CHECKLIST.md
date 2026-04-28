@@ -77,8 +77,9 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 - 컨텍스트 메뉴 (새로 만들기, 정렬, 새로고침)
 - iframe 앱 (Experience Space, Interactive Plains)
 
-### 런칭 전 추가 기능
+### 런칭 후 — 콘텐츠 확립 후 체크
 
+- [ ] 초기 진입 경험 — 처음 방문자가 뭘 보고 뭘 하게 되는가
 - [ ] URL 바로가기 만들기 — 컨텍스트 메뉴 또는 브라우저 앱에서 URL 입력 → .url 파일 생성 → 바탕화면에 아이콘 추가. 기존 FSNode url 필드 + EXT_APP_MAP 활용. 콘텐츠 브릿지의 첫 단추
 - [ ] 내보내기/가져오기 — Settings에서 FS 데이터 JSON 다운로드/업로드 (Supabase 전까지의 수동 백업)
 

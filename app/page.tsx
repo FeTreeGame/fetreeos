@@ -69,8 +69,8 @@ function detectSnap(cursorX: number, cursorY: number, container: DOMRect): SnapZ
 let zCounter = 1;
 
 type DragMode =
-  | { kind: 'move'; id: string; offsetX: number; offsetY: number; startX?: number; startY?: number; originX?: number; originY?: number; originW?: number; originH?: number }
-  | { kind: 'resize'; id: string; edge: string; startX: number; startY: number; startW: number; startH: number; startWX: number; startWY: number };
+  | { kind: 'move'; id: string; offsetX: number; offsetY: number; startX?: number; startY?: number; originX?: number; originY?: number; originW?: number; originH?: number; currentX?: number; currentY?: number }
+  | { kind: 'resize'; id: string; edge: string; startX: number; startY: number; startW: number; startH: number; startWX: number; startWY: number; currentX?: number; currentY?: number; currentW?: number; currentH?: number };
 
 interface AppWindowProps {
   win: WindowState;
@@ -213,8 +213,9 @@ const AppWindow = memo(function AppWindow({
 
 export default function Home() {
   const [windows, setWindows] = useState<WindowState[]>([]);
-  const [drag, setDrag] = useState<DragMode | null>(null);
-  const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
+  const dragRef = useRef<DragMode | null>(null);
+  const [dragging, setDragging] = useState<{ kind: 'move' | 'resize'; id: string; edge?: string } | null>(null);
+  const snapPreviewRef = useRef<HTMLDivElement>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -366,12 +367,10 @@ export default function Home() {
     if (!winEl) return;
     const rect = winEl.getBoundingClientRect();
     rootRef.current?.setPointerCapture(e.pointerId);
-    setWindows(prev => {
-      const w = prev.find(win => win.id === id);
-      setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, startX: e.clientX, startY: e.clientY, originX: w?.x, originY: w?.y, originW: w?.w, originH: w?.h });
-      return prev;
-    });
-  }, [focusWindow, toggleMaximize]);
+    const w = windows.find(win => win.id === id);
+    dragRef.current = { kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, startX: e.clientX, startY: e.clientY, originX: w?.x, originY: w?.y, originW: w?.w, originH: w?.h };
+    setDragging({ kind: 'move', id });
+  }, [focusWindow, toggleMaximize, windows]);
 
   const handleSnapRestore = useCallback((id: string, e: React.PointerEvent, preSnapW?: number, preSnapH?: number) => {
     const desktop = desktopRef.current;
@@ -391,20 +390,19 @@ export default function Home() {
       w: restoreW, h: restoreH,
     } : w));
     rootRef.current?.setPointerCapture(e.pointerId);
-    setDrag({ kind: 'move', id, offsetX, offsetY });
+    dragRef.current = { kind: 'move', id, offsetX, offsetY };
+    setDragging({ kind: 'move', id });
   }, []);
 
   const handleResizePointerDown = useCallback((id: string, edge: string, e: React.PointerEvent) => {
     e.stopPropagation();
     focusWindow(id);
     rootRef.current?.setPointerCapture(e.pointerId);
-    setWindows(prev => {
-      const w = prev.find(win => win.id === id);
-      if (!w) return prev;
-      setDrag({ kind: 'resize', id, edge, startX: e.clientX, startY: e.clientY, startW: w.w, startH: w.h, startWX: w.x, startWY: w.y });
-      return prev;
-    });
-  }, [focusWindow]);
+    const w = windows.find(win => win.id === id);
+    if (!w) return;
+    dragRef.current = { kind: 'resize', id, edge, startX: e.clientX, startY: e.clientY, startW: w.w, startH: w.h, startWX: w.x, startWY: w.y };
+    setDragging({ kind: 'resize', id, edge });
+  }, [focusWindow, windows]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
@@ -420,53 +418,82 @@ export default function Home() {
         setCrossDropTarget(null);
       }
     }
-    if (!drag) return;
+    const d = dragRef.current;
+    if (!d) return;
     const desktop = desktopRef.current;
     if (!desktop) return;
     const dr = desktop.getBoundingClientRect();
 
-    if (drag.kind === 'move') {
-      if (drag.startX != null && drag.startY != null) {
-        const dx = e.clientX - drag.startX;
-        const dy = e.clientY - drag.startY;
+    if (d.kind === 'move') {
+      if (d.startX != null && d.startY != null) {
+        const dx = e.clientX - d.startX;
+        const dy = e.clientY - d.startY;
         if (dx * dx + dy * dy < 9) return;
-        const win = windows.find(w => w.id === drag.id);
+        const win = windows.find(w => w.id === d.id);
         if (win && (win.snapZone || win.maximized)) {
-          handleSnapRestore(drag.id, e, win.preSnapW, win.preSnapH);
+          handleSnapRestore(d.id, e, win.preSnapW, win.preSnapH);
           return;
         }
-        setDrag({ ...drag, startX: undefined, startY: undefined });
+        dragRef.current = { ...d, startX: undefined, startY: undefined };
       }
-      let x = (e.clientX - dr.left - drag.offsetX) / dr.width;
-      let y = (e.clientY - dr.top - drag.offsetY) / dr.height;
+      let x = (e.clientX - dr.left - d.offsetX) / dr.width;
+      let y = (e.clientY - dr.top - d.offsetY) / dr.height;
       x = Math.max(-0.2, Math.min(x, 1 - 80 / dr.width));
       y = Math.max(0, Math.min(y, 1 - 40 / dr.height));
-      setWindows(prev => prev.map(w => w.id === drag.id ? { ...w, x, y, maximized: false, snapZone: null } : w));
-      setSnapPreview(detectSnap(e.clientX, e.clientY, dr));
+
+      dragRef.current = { ...dragRef.current!, currentX: x, currentY: y };
+
+      const el = document.getElementById(`win-${d.id}`);
+      if (el) {
+        el.style.left = `${x * 100}%`;
+        el.style.top = `${y * 100}%`;
+      }
+
+      const snap = detectSnap(e.clientX, e.clientY, dr);
+      const spEl = snapPreviewRef.current;
+      if (spEl) {
+        if (snap) {
+          const rect = SNAP_RECTS[snap];
+          spEl.style.display = 'block';
+          spEl.style.left = rect.left;
+          spEl.style.top = rect.top;
+          spEl.style.width = rect.width;
+          spEl.style.height = rect.height;
+        } else {
+          spEl.style.display = 'none';
+        }
+      }
     } else {
-      const dx = (e.clientX - drag.startX) / dr.width;
-      const dy = (e.clientY - drag.startY) / dr.height;
+      const dx = (e.clientX - d.startX) / dr.width;
+      const dy = (e.clientY - d.startY) / dr.height;
       const minW = MIN_W_PX / dr.width;
       const minH = MIN_H_PX / dr.height;
-      setWindows(prev => prev.map(w => {
-        if (w.id !== drag.id) return w;
-        const next = { ...w };
-        if (drag.edge.includes('e')) next.w = Math.max(minW, drag.startW + dx);
-        if (drag.edge.includes('s')) next.h = Math.max(minH, drag.startH + dy);
-        if (drag.edge.includes('w')) {
-          const newW = Math.max(minW, drag.startW - dx);
-          next.x = drag.startWX + (drag.startW - newW);
-          next.w = newW;
-        }
-        if (drag.edge.includes('n')) {
-          const newH = Math.max(minH, drag.startH - dy);
-          next.y = drag.startWY + (drag.startH - newH);
-          next.h = newH;
-        }
-        return next;
-      }));
+
+      let newX = d.startWX, newY = d.startWY;
+      let newW = d.startW, newH = d.startH;
+
+      if (d.edge.includes('e')) newW = Math.max(minW, d.startW + dx);
+      if (d.edge.includes('s')) newH = Math.max(minH, d.startH + dy);
+      if (d.edge.includes('w')) {
+        newW = Math.max(minW, d.startW - dx);
+        newX = d.startWX + (d.startW - newW);
+      }
+      if (d.edge.includes('n')) {
+        newH = Math.max(minH, d.startH - dy);
+        newY = d.startWY + (d.startH - newH);
+      }
+
+      dragRef.current = { ...d, currentX: newX, currentY: newY, currentW: newW, currentH: newH };
+
+      const el = document.getElementById(`win-${d.id}`);
+      if (el) {
+        el.style.left = `${newX * 100}%`;
+        el.style.top = `${newY * 100}%`;
+        el.style.width = `${newW * 100}%`;
+        el.style.height = `${newH * 100}%`;
+      }
     }
-  }, [drag, iconDragInfo, windows, handleSnapRestore]);
+  }, [iconDragInfo, windows, handleSnapRestore]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
@@ -505,29 +532,51 @@ export default function Home() {
       setIconDragInfo(null);
       setCrossDropTarget(null);
     }
-    if (drag?.kind === 'move' && snapPreview) {
-      setWindows(prev => prev.map(w => w.id === drag.id ? {
-        ...w,
-        snapZone: snapPreview,
-        maximized: snapPreview === 'fullscreen',
-        preSnapX: w.snapZone ? w.preSnapX : (drag.originX ?? w.x),
-        preSnapY: w.snapZone ? w.preSnapY : (drag.originY ?? w.y),
-        preSnapW: w.snapZone ? w.preSnapW : (drag.originW ?? w.w),
-        preSnapH: w.snapZone ? w.preSnapH : (drag.originH ?? w.h),
-      } : w));
+    const d = dragRef.current;
+    if (d) {
+      const desktop = desktopRef.current;
+      if (d.kind === 'move') {
+        const snap = desktop ? detectSnap(e.clientX, e.clientY, desktop.getBoundingClientRect()) : null;
+        if (snap) {
+          setWindows(prev => prev.map(w => w.id === d.id ? {
+            ...w,
+            snapZone: snap,
+            maximized: snap === 'fullscreen',
+            preSnapX: w.snapZone ? w.preSnapX : (d.originX ?? w.x),
+            preSnapY: w.snapZone ? w.preSnapY : (d.originY ?? w.y),
+            preSnapW: w.snapZone ? w.preSnapW : (d.originW ?? w.w),
+            preSnapH: w.snapZone ? w.preSnapH : (d.originH ?? w.h),
+          } : w));
+        } else if (d.currentX !== undefined && d.currentY !== undefined) {
+          setWindows(prev => prev.map(w => w.id === d.id ? {
+            ...w, x: d.currentX!, y: d.currentY!, maximized: false, snapZone: null,
+          } : w));
+        }
+      } else {
+        if (d.currentW !== undefined) {
+          setWindows(prev => prev.map(w => w.id === d.id ? {
+            ...w,
+            x: d.currentX ?? w.x,
+            y: d.currentY ?? w.y,
+            w: d.currentW ?? w.w,
+            h: d.currentH ?? w.h,
+          } : w));
+        }
+      }
+      if (rootRef.current && e.pointerId !== undefined && rootRef.current.hasPointerCapture(e.pointerId)) {
+        rootRef.current.releasePointerCapture(e.pointerId);
+      }
+      dragRef.current = null;
+      setDragging(null);
+      if (snapPreviewRef.current) snapPreviewRef.current.style.display = 'none';
     }
-    if (drag && rootRef.current && e.pointerId !== undefined && rootRef.current.hasPointerCapture(e.pointerId)) {
-      rootRef.current.releasePointerCapture(e.pointerId);
-    }
-    setDrag(null);
-    setSnapPreview(null);
-  }, [drag, snapPreview, iconDragInfo, refreshDesktop, focusWindow]);
+  }, [iconDragInfo, refreshDesktop, focusWindow]);
 
 
   return (
     <div
       ref={rootRef}
-      className="w-screen flex flex-col overflow-hidden select-none" style={{ height: '100dvh', cursor: drag?.kind === 'resize' ? `${drag.edge}-resize` : undefined }}
+      className="w-screen flex flex-col overflow-hidden select-none" style={{ height: '100dvh', cursor: dragging?.kind === 'resize' ? `${dragging.edge}-resize` : undefined }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
@@ -538,18 +587,17 @@ export default function Home() {
         style={{ background: 'linear-gradient(135deg, #1a3a4a 0%, #0d1f2d 50%, #1a2a3a 100%)' }}
         onClick={() => { setStartMenuOpen(false); if (!suppressDesktopBlur.current) setFocusedId(null); }}
       >
-        {/* Snap Preview */}
-        {snapPreview && drag?.kind === 'move' && (
-          <div
-            className="absolute rounded-lg pointer-events-none transition-all duration-150"
-            style={{
-              ...SNAP_RECTS[snapPreview],
-              background: 'rgba(100, 140, 255, 0.15)',
-              border: '2px solid rgba(100, 140, 255, 0.4)',
-              zIndex: 9998,
-            }}
-          />
-        )}
+        {/* Snap Preview — always mounted, display toggled via ref */}
+        <div
+          ref={snapPreviewRef}
+          className="absolute rounded-lg pointer-events-none transition-all duration-150"
+          style={{
+            display: 'none',
+            background: 'rgba(100, 140, 255, 0.15)',
+            border: '2px solid rgba(100, 140, 255, 0.4)',
+            zIndex: 9998,
+          }}
+        />
 
         {/* Desktop Icons — FileExplorer desktop mode */}
         <div className="absolute inset-0">
@@ -562,8 +610,8 @@ export default function Home() {
             key={win.id}
             win={win}
             isTop={win.id === focusedId}
-            dragging={!!iconDragInfo || !!drag}
-            dragId={drag?.id ?? null}
+            dragging={!!iconDragInfo || !!dragging}
+            dragId={dragging?.id ?? null}
             fsRevision={fsRevision}
             onFocus={focusWindow}
             onClose={closeWindow}

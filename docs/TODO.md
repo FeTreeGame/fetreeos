@@ -557,21 +557,25 @@ P1과 P2(a)는 외부 동작 변경 없이 내부 구현만 수정하는 작업.
 P1은 fileSystem.ts 내부에 캐시 변수 추가 + saveFS에서 갱신, 외부 함수 시그니처 불변.
 P2(a)는 page.tsx의 창 렌더링 JSX를 별도 컴포넌트로 추출 + memo 감싸기.
 둘 다 기능 추가/변경 없이 성능만 개선. 새 기능 작업 전에 끼워넣기 좋은 타이밍.
-P2(b)(c)는 드래그 체감이 실제로 문제될 때 — 스냅/리사이즈 전체를 rAF로 전환해야 하므로 단독 작업 단위.
+P2(b) 완료 — ref + DOM 직접 갱신 전환 済. 드래그 중 React 리렌더 0회.
+P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충분하므로 후순위.
 
 ### P3~P4 (낮은 우선순위)
 
 - P3: 아이콘 드래그 중 setState 3개 동시 갱신 (iconDrag, dropTarget, selectedIds) — React 18 배칭으로 1회 합산되지만 구조적 비용
 - P4: 그리드 디버그 오버레이 cols×rows div 매 렌더 생성 — 디버그 전용이므로 낮음
 
+## ✅ 완료 — ref + rAF 전환 (P2(b))
+
+드래그/리사이즈/스냅 전체를 setState 기반에서 ref + DOM 직접 갱신으로 일괄 전환. 상세: `docs/RAF_MIGRATION_PLAN.md`
+
+- [x] 드래그 중 useRef로 좌표 추적, DOM style 직접 갱신 → 끝나면 setState 확정
+- [x] 리사이즈 중 style.left/top/width/height를 ref로 직접 변경 → 끝나면 setState 확정
+- [x] 스냅 프리뷰도 ref 전환 (항상 마운트, display 토글)
+- [ ] CSS transform + will-change 조합으로 compositor 레이어 승격 — 추가 최적화 여지, 현재 체감 충분
+
 ## 인지된 과제
 
-- [ ] 드래그/리사이즈 반응성 개선 — React state→DOM 1프레임 지연이 원인 (정합성은 확인 완료). 드래그 중 래스터화 레이어 전환 등 compositor 수준 접근 필요. daedalOS 참조
-  - 현상: 리사이즈 시 커서가 빠르게 움직이면 창 가장자리가 1~2프레임 뒤처짐 (OS 네이티브에서는 커서와 가장자리가 동기적으로 일치)
-  - 원인: 브라우저에서는 mousemove → JS handler → React setState → 리렌더 → DOM update → paint 파이프라인을 거침. OS는 커서 이동과 창 리사이즈를 같은 메시지 루프에서 동기 처리
-  - 커서 강제 이동(가장자리 고정)은 브라우저 보안 정책으로 불가능 (MouseEvent 좌표는 읽기 전용)
-  - 해결 방향: P2(b) ref + rAF 직접 DOM 갱신으로 React 리렌더 우회. 리사이즈 중 style.left/top/width/height를 ref로 직접 변경, 끝나면 setState로 확정. 드래그와 리사이즈를 함께 전환해야 하므로 단독 작업 단위
-  - 주의: 현재 구조(setState 기반)에서 이 전환이 늦어질수록 스냅/리사이즈/드래그 로직이 복잡해져 전환 비용이 증가함. 기능 추가보다 이 전환을 먼저 하는 것이 장기적으로 유리할 수 있음
 - [x] 메모장 새 파일 생성 시 3중 생성 버그 — initialized ref 가드 + onFSChange 호출로 해결
 - [x] 바탕화면 새 파일/폴더 생성 위치 — 명시적 새로고침 모델 도입으로 해결
 - [x] 탐색기 폴더 진입 시 '빈 폴더입니다' 플리커 — hydration useEffect에서 items 동기 로드 + hydrated 플래그로 빈 폴더 메시지 지연 표시

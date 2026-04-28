@@ -22,6 +22,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - Alert 다이얼로그 — 연결 앱이 없는 파일 열기 시 경고 표시
 
 ### Changed
+- 드래그/리사이즈 엔진 — setState 기반에서 ref + DOM 직접 갱신으로 전환 (드래그 중 React 리렌더 0회)
 - Notepad 파일 생성 지연 — 열기 시 메모리만 사용, Save 시에만 파일 생성
 - Branding: FeTreeGame → FeTreeOS (package.json, layout, meta tags, welcome file)
 - OG meta tags added for link sharing

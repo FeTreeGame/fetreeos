@@ -45,3 +45,4 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 전체 초기화 시 fsCache 미초기화 — 이전 데이터 위에 덮어쓰기되던 문제
 - 자동정렬 시 새 파일이 정렬 순서 중간에 삽입되던 문제 — 기존 위치 유지 + 새 아이템 말미 배치 복원 (fb0c122 후퇴 수정), 최초 접속 시에는 정렬 기준 배치
 - Gallery DetailView z-index가 리사이즈 핸들을 가리던 문제 — z-10 제거
+- 최초 진입 시 아이콘이 정렬 기준을 무시하고 FS 순서로 배치되던 문제 — items 빈 배열 상태에서 TRASH_NODE만으로 layout effect가 선행 실행되어 PRESERVE 분기 진입. items.length === 0 가드 추가

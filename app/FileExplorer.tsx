@@ -183,6 +183,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   useEffect(() => {
     if (!hydrated || !isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
+    if (items.length === 0) return;
     const all = allDesktopItems();
     const saved = loadIconPositions();
     const { cols, rows } = gridSize;

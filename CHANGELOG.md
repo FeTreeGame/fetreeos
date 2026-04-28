@@ -24,8 +24,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - OG meta tags added for link sharing
 - 정렬 우선순위: system(0) → app(1) → folder(2) → file(3)
 - 자동정렬 기본값 ON, 초기 배치에 정렬 기준(유형순) 적용
+- 스냅 해제를 드래그 델타 기반으로 변경 (3px threshold, Windows 동작 일치)
+- 타이틀바 더블클릭: 비전체화면 스냅 → 스냅 전 위치/크기로 복원
+- 스냅/전체화면 복원 시 드래그 전 원래 위치로 복귀 (preSnapX/Y 저장)
 
 ### Fixed
 - hydration 레이스 컨디션 — autoArrange가 localStorage 복원 전에 레이아웃 실행되는 문제
 - 자동정렬 초기값 — localStorage 미존재 시 OFF로 설정되던 문제
 - 전체 초기화 — autoArrange, desktopSort, notes 키 누락 + state 리로드 추가
+- 타이틀바 더블클릭 전체화면/복원 미작동 — setPointerCapture가 dblclick 이벤트 차단
+- 전체화면 복원 시 포커스 해제 — 창 축소 후 바탕화면 click 전파로 focusedId 초기화

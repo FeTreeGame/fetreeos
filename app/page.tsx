@@ -22,6 +22,8 @@ interface WindowState {
   minimized: boolean;
   maximized: boolean;
   snapZone: SnapZone;
+  preSnapX?: number;
+  preSnapY?: number;
   preSnapW?: number;
   preSnapH?: number;
   zIndex: number;
@@ -67,7 +69,7 @@ function detectSnap(cursorX: number, cursorY: number, container: DOMRect): SnapZ
 let zCounter = 1;
 
 type DragMode =
-  | { kind: 'move'; id: string; offsetX: number; offsetY: number; startX?: number; startY?: number }
+  | { kind: 'move'; id: string; offsetX: number; offsetY: number; startX?: number; startY?: number; originX?: number; originY?: number; originW?: number; originH?: number }
   | { kind: 'resize'; id: string; edge: string; startX: number; startY: number; startW: number; startH: number; startWX: number; startWY: number };
 
 interface AppWindowProps {
@@ -142,7 +144,6 @@ const AppWindow = memo(function AppWindow({
           onFocus(win.id);
           onTitlePointerDown(win.id, e);
         }}
-        onDoubleClick={() => onToggleMaximize(win.id)}
       >
         <span className="text-sm">{win.app.icon}</span>
         <span className={`text-xs flex-1 ${isTop ? 'text-white/90' : 'text-white/40'}`}>{win.app.title}</span>
@@ -314,11 +315,28 @@ export default function Home() {
   const toggleMaximize = useCallback((id: string) => {
     setWindows(prev => prev.map(w => {
       if (w.id !== id) return w;
+      if (w.snapZone && w.snapZone !== 'fullscreen') {
+        const rw = w.preSnapW ?? 0.4;
+        const rh = w.preSnapH ?? 0.35;
+        return {
+          ...w,
+          snapZone: null,
+          x: w.preSnapX ?? Math.max(0, Math.min(w.x, 1 - rw)),
+          y: w.preSnapY ?? Math.max(0, Math.min(w.y, 1 - rh)),
+          w: rw,
+          h: rh,
+          zIndex: topZIndex(),
+        };
+      }
       const goingMax = !w.maximized;
       return {
         ...w,
         maximized: goingMax,
         snapZone: goingMax ? 'fullscreen' : null,
+        x: goingMax ? w.x : (w.preSnapX ?? w.x),
+        y: goingMax ? w.y : (w.preSnapY ?? w.y),
+        preSnapX: goingMax && !w.snapZone ? w.x : w.preSnapX,
+        preSnapY: goingMax && !w.snapZone ? w.y : w.preSnapY,
         preSnapW: goingMax && !w.snapZone ? w.w : w.preSnapW,
         preSnapH: goingMax && !w.snapZone ? w.h : w.preSnapH,
         zIndex: topZIndex(),
@@ -330,14 +348,30 @@ export default function Home() {
     setWindows(prev => prev.map(w => w.id === id ? { ...w, browserUrl: url } : w));
   }, []);
 
+  const lastTitleClick = useRef<{ id: string; time: number }>({ id: '', time: 0 });
+  const suppressDesktopBlur = useRef(false);
   const handleTitlePointerDown = useCallback((id: string, e: React.PointerEvent) => {
     focusWindow(id);
-    const win = document.getElementById(`win-${id}`);
-    if (!win) return;
-    const rect = win.getBoundingClientRect();
+    const now = Date.now();
+    const last = lastTitleClick.current;
+    if (last.id === id && now - last.time < 350) {
+      lastTitleClick.current = { id: '', time: 0 };
+      suppressDesktopBlur.current = true;
+      setTimeout(() => { suppressDesktopBlur.current = false; }, 100);
+      toggleMaximize(id);
+      return;
+    }
+    lastTitleClick.current = { id, time: now };
+    const winEl = document.getElementById(`win-${id}`);
+    if (!winEl) return;
+    const rect = winEl.getBoundingClientRect();
     rootRef.current?.setPointerCapture(e.pointerId);
-    setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, startX: e.clientX, startY: e.clientY });
-  }, [focusWindow]);
+    setWindows(prev => {
+      const w = prev.find(win => win.id === id);
+      setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, startX: e.clientX, startY: e.clientY, originX: w?.x, originY: w?.y, originW: w?.w, originH: w?.h });
+      return prev;
+    });
+  }, [focusWindow, toggleMaximize]);
 
   const handleSnapRestore = useCallback((id: string, e: React.PointerEvent, preSnapW?: number, preSnapH?: number) => {
     const desktop = desktopRef.current;
@@ -392,14 +426,16 @@ export default function Home() {
     const dr = desktop.getBoundingClientRect();
 
     if (drag.kind === 'move') {
-      const win = windows.find(w => w.id === drag.id);
-      const isSnapped = win && (win.snapZone || win.maximized);
-      if (isSnapped && drag.startX != null && drag.startY != null) {
+      if (drag.startX != null && drag.startY != null) {
         const dx = e.clientX - drag.startX;
         const dy = e.clientY - drag.startY;
-        if (dx * dx + dy * dy < 25) return;
-        handleSnapRestore(drag.id, e, win.preSnapW, win.preSnapH);
-        return;
+        if (dx * dx + dy * dy < 9) return;
+        const win = windows.find(w => w.id === drag.id);
+        if (win && (win.snapZone || win.maximized)) {
+          handleSnapRestore(drag.id, e, win.preSnapW, win.preSnapH);
+          return;
+        }
+        setDrag({ ...drag, startX: undefined, startY: undefined });
       }
       let x = (e.clientX - dr.left - drag.offsetX) / dr.width;
       let y = (e.clientY - dr.top - drag.offsetY) / dr.height;
@@ -474,11 +510,13 @@ export default function Home() {
         ...w,
         snapZone: snapPreview,
         maximized: snapPreview === 'fullscreen',
-        preSnapW: w.snapZone ? w.preSnapW : w.w,
-        preSnapH: w.snapZone ? w.preSnapH : w.h,
+        preSnapX: w.snapZone ? w.preSnapX : (drag.originX ?? w.x),
+        preSnapY: w.snapZone ? w.preSnapY : (drag.originY ?? w.y),
+        preSnapW: w.snapZone ? w.preSnapW : (drag.originW ?? w.w),
+        preSnapH: w.snapZone ? w.preSnapH : (drag.originH ?? w.h),
       } : w));
     }
-    if (drag && rootRef.current && e.pointerId !== undefined) {
+    if (drag && rootRef.current && e.pointerId !== undefined && rootRef.current.hasPointerCapture(e.pointerId)) {
       rootRef.current.releasePointerCapture(e.pointerId);
     }
     setDrag(null);
@@ -498,7 +536,7 @@ export default function Home() {
         ref={desktopRef}
         className="flex-1 relative overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #1a3a4a 0%, #0d1f2d 50%, #1a2a3a 100%)' }}
-        onClick={() => { setStartMenuOpen(false); setFocusedId(null); }}
+        onClick={() => { setStartMenuOpen(false); if (!suppressDesktopBlur.current) setFocusedId(null); }}
       >
         {/* Snap Preview */}
         {snapPreview && drag?.kind === 'move' && (

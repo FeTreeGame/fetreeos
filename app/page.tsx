@@ -67,7 +67,7 @@ function detectSnap(cursorX: number, cursorY: number, container: DOMRect): SnapZ
 let zCounter = 1;
 
 type DragMode =
-  | { kind: 'move'; id: string; offsetX: number; offsetY: number }
+  | { kind: 'move'; id: string; offsetX: number; offsetY: number; startX?: number; startY?: number }
   | { kind: 'resize'; id: string; edge: string; startX: number; startY: number; startW: number; startH: number; startWX: number; startWY: number };
 
 interface AppWindowProps {
@@ -82,7 +82,6 @@ interface AppWindowProps {
   onToggleMaximize: (id: string) => void;
   onTitlePointerDown: (id: string, e: React.PointerEvent) => void;
   onResizePointerDown: (id: string, edge: string, e: React.PointerEvent) => void;
-  onSnapRestore: (id: string, e: React.PointerEvent, preSnapW?: number, preSnapH?: number) => void;
   onOpenNode: (node: FSNode) => void;
   onFSChange: () => void;
   onNavigateBrowser: (id: string, url: string) => void;
@@ -92,7 +91,7 @@ interface AppWindowProps {
 const AppWindow = memo(function AppWindow({
   win, isTop, dragging, dragId, fsRevision,
   onFocus, onClose, onMinimize, onToggleMaximize,
-  onTitlePointerDown, onResizePointerDown, onSnapRestore,
+  onTitlePointerDown, onResizePointerDown,
   onOpenNode, onFSChange, onNavigateBrowser, onIconDragChange,
 }: AppWindowProps) {
   if (win.minimized) return null;
@@ -141,10 +140,6 @@ const AppWindow = memo(function AppWindow({
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest('button')) return;
           onFocus(win.id);
-          if (isSnapped || isMax) {
-            onSnapRestore(win.id, e, win.preSnapW, win.preSnapH);
-            return;
-          }
           onTitlePointerDown(win.id, e);
         }}
         onDoubleClick={() => onToggleMaximize(win.id)}
@@ -341,7 +336,7 @@ export default function Home() {
     if (!win) return;
     const rect = win.getBoundingClientRect();
     rootRef.current?.setPointerCapture(e.pointerId);
-    setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top });
+    setDrag({ kind: 'move', id, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, startX: e.clientX, startY: e.clientY });
   }, [focusWindow]);
 
   const handleSnapRestore = useCallback((id: string, e: React.PointerEvent, preSnapW?: number, preSnapH?: number) => {
@@ -397,6 +392,15 @@ export default function Home() {
     const dr = desktop.getBoundingClientRect();
 
     if (drag.kind === 'move') {
+      const win = windows.find(w => w.id === drag.id);
+      const isSnapped = win && (win.snapZone || win.maximized);
+      if (isSnapped && drag.startX != null && drag.startY != null) {
+        const dx = e.clientX - drag.startX;
+        const dy = e.clientY - drag.startY;
+        if (dx * dx + dy * dy < 25) return;
+        handleSnapRestore(drag.id, e, win.preSnapW, win.preSnapH);
+        return;
+      }
       let x = (e.clientX - dr.left - drag.offsetX) / dr.width;
       let y = (e.clientY - dr.top - drag.offsetY) / dr.height;
       x = Math.max(-0.2, Math.min(x, 1 - 80 / dr.width));
@@ -426,7 +430,7 @@ export default function Home() {
         return next;
       }));
     }
-  }, [drag, iconDragInfo]);
+  }, [drag, iconDragInfo, windows, handleSnapRestore]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
@@ -529,7 +533,6 @@ export default function Home() {
             onToggleMaximize={toggleMaximize}
             onTitlePointerDown={handleTitlePointerDown}
             onResizePointerDown={handleResizePointerDown}
-            onSnapRestore={handleSnapRestore}
             onOpenNode={openNode}
             onFSChange={refreshDesktop}
             onNavigateBrowser={navigateBrowser}

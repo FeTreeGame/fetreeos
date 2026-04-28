@@ -30,6 +30,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 스냅 해제를 드래그 델타 기반으로 변경 (3px threshold, Windows 동작 일치)
 - 타이틀바 더블클릭: 비전체화면 스냅 → 스냅 전 위치/크기로 복원
 - 스냅/전체화면 복원 시 드래그 전 원래 위치로 복귀 (preSnapX/Y 저장)
+- 리사이즈 핸들 히트 영역 확대 — 가장자리 10px(±5 오프셋), 코너 16px, 창 바깥으로 돌출
+- 리사이즈 중 커서 고정 — 루트 div에 drag.edge 기반 resize cursor 설정
+- 창 overflow 구조 변경 — overflow:hidden을 내부 wrapper div로 이동 (핸들 클리핑 방지)
 
 ### Fixed
 - hydration 레이스 컨디션 — autoArrange가 localStorage 복원 전에 레이아웃 실행되는 문제
@@ -41,3 +44,4 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 미연결 파일 fallback이 Notepad이던 문제 — Alert 다이얼로그로 변경
 - 전체 초기화 시 fsCache 미초기화 — 이전 데이터 위에 덮어쓰기되던 문제
 - 자동정렬 시 새 파일이 정렬 순서 중간에 삽입되던 문제 — 기존 위치 유지 + 새 아이템 말미 배치 복원 (fb0c122 후퇴 수정), 최초 접속 시에는 정렬 기준 배치
+- Gallery DetailView z-index가 리사이즈 핸들을 가리던 문제 — z-10 제거

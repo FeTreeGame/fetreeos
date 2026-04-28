@@ -117,7 +117,7 @@ function DetailView({ artworks, index, onClose, onPrev, onNext }: {
   if (!artwork) return null;
 
   return (
-    <div className="absolute inset-0 bg-zinc-950/90 flex flex-col z-10">
+    <div className="absolute inset-0 bg-zinc-950/90 flex flex-col">
       <div className="flex items-center justify-between px-3 py-2">
         <span className="text-xs text-zinc-500">{index + 1} / {artworks.length}</span>
         <span className="text-xs text-zinc-500">{formatDate(artwork.created_at)}</span>

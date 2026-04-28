@@ -112,7 +112,6 @@ const AppWindow = memo(function AppWindow({
         zIndex: win.zIndex,
         border: isMax ? 'none' : '1px solid rgba(255,255,255,0.15)',
         borderRadius: isMax ? 0 : 4,
-        overflow: 'hidden',
         pointerEvents: dragging ? 'none' as const : undefined,
       } : {
         left: `${win.x * 100}%`,
@@ -122,7 +121,6 @@ const AppWindow = memo(function AppWindow({
         zIndex: win.zIndex,
         border: '1px solid rgba(255,255,255,0.15)',
         borderRadius: 8,
-        overflow: 'hidden',
         minWidth: MIN_W_PX,
         minHeight: MIN_H_PX,
         pointerEvents: dragging ? 'none' as const : undefined,
@@ -130,6 +128,7 @@ const AppWindow = memo(function AppWindow({
       onPointerDown={() => onFocus(win.id)}
       onClick={(e) => e.stopPropagation()}
     >
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden" style={{ borderRadius: 'inherit' }}>
       {/* Title Bar */}
       <div
         className="h-8 flex items-center px-3 gap-2 shrink-0"
@@ -196,16 +195,17 @@ const AppWindow = memo(function AppWindow({
           </div>
         )}
       </div>
+      </div>
       {/* Resize handles */}
       {!isMax && !isSnapped && <>
-        <div className="absolute top-0 left-0 right-0 h-1 cursor-n-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'n', e)} />
-        <div className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize" onPointerDown={(e) => onResizePointerDown(win.id, 's', e)} />
-        <div className="absolute top-0 left-0 bottom-0 w-1 cursor-w-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'w', e)} />
-        <div className="absolute top-0 right-0 bottom-0 w-1 cursor-e-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'e', e)} />
-        <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'nw', e)} />
-        <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'ne', e)} />
-        <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'sw', e)} />
-        <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize" onPointerDown={(e) => onResizePointerDown(win.id, 'se', e)} />
+        <div className="absolute left-0 right-0 cursor-n-resize" style={{ top: -5, height: 10, zIndex: 1 }} onPointerDown={(e) => onResizePointerDown(win.id, 'n', e)} />
+        <div className="absolute left-0 right-0 cursor-s-resize" style={{ bottom: -5, height: 10, zIndex: 1 }} onPointerDown={(e) => onResizePointerDown(win.id, 's', e)} />
+        <div className="absolute top-0 bottom-0 cursor-w-resize" style={{ left: -5, width: 10, zIndex: 1 }} onPointerDown={(e) => onResizePointerDown(win.id, 'w', e)} />
+        <div className="absolute top-0 bottom-0 cursor-e-resize" style={{ right: -5, width: 10, zIndex: 1 }} onPointerDown={(e) => onResizePointerDown(win.id, 'e', e)} />
+        <div className="absolute cursor-nw-resize" style={{ top: -5, left: -5, width: 16, height: 16, zIndex: 2 }} onPointerDown={(e) => onResizePointerDown(win.id, 'nw', e)} />
+        <div className="absolute cursor-ne-resize" style={{ top: -5, right: -5, width: 16, height: 16, zIndex: 2 }} onPointerDown={(e) => onResizePointerDown(win.id, 'ne', e)} />
+        <div className="absolute cursor-sw-resize" style={{ bottom: -5, left: -5, width: 16, height: 16, zIndex: 2 }} onPointerDown={(e) => onResizePointerDown(win.id, 'sw', e)} />
+        <div className="absolute cursor-se-resize" style={{ bottom: -5, right: -5, width: 16, height: 16, zIndex: 2 }} onPointerDown={(e) => onResizePointerDown(win.id, 'se', e)} />
       </>}
     </div>
   );
@@ -527,7 +527,7 @@ export default function Home() {
   return (
     <div
       ref={rootRef}
-      className="w-screen flex flex-col overflow-hidden select-none" style={{ height: '100dvh' }}
+      className="w-screen flex flex-col overflow-hidden select-none" style={{ height: '100dvh', cursor: drag?.kind === 'resize' ? `${drag.edge}-resize` : undefined }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >

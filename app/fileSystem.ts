@@ -55,6 +55,10 @@ export function loadFS(): FSNode[] {
   }
 }
 
+export function clearFSCache(): void {
+  fsCache = null;
+}
+
 function saveFS(nodes: FSNode[]): void {
   fsCache = nodes;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nodes));

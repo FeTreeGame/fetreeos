@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { initDefaultFS } from './fileSystem';
+import { initDefaultFS, clearFSCache } from './fileSystem';
 
 const ICON_POS_KEY = 'fetree-icon-positions';
 
@@ -36,6 +36,7 @@ export default function Settings({ onFSChange }: SettingsProps) {
     localStorage.removeItem('fetree-auto-arrange');
     localStorage.removeItem('fetree-desktop-sort');
     localStorage.removeItem('fetree-notes');
+    clearFSCache();
     initDefaultFS();
     onFSChange?.();
   };

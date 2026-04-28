@@ -39,3 +39,5 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 전체화면 복원 시 포커스 해제 — 창 축소 후 바탕화면 click 전파로 focusedId 초기화
 - 휴지통이 Notepad로 열리는 문제 — trash를 explorer로 열도록 수정
 - 미연결 파일 fallback이 Notepad이던 문제 — Alert 다이얼로그로 변경
+- 전체 초기화 시 fsCache 미초기화 — 이전 데이터 위에 덮어쓰기되던 문제
+- 자동정렬 시 새 파일이 정렬 순서 중간에 삽입되던 문제 — 기존 위치 유지 + 새 아이템 말미 배치 복원 (fb0c122 후퇴 수정), 최초 접속 시에는 정렬 기준 배치

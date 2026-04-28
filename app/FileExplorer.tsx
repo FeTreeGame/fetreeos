@@ -183,11 +183,29 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   useEffect(() => {
     if (!hydrated || !isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
+    const all = allDesktopItems();
+    const saved = loadIconPositions();
+    const { cols, rows } = gridSize;
     if (autoArrange) {
-      sortLayout();
+      const withPos: { id: string; idx: number }[] = [];
+      const newItems: (typeof all)[number][] = [];
+      for (const item of all) {
+        const pos = saved[item.id];
+        if (pos) {
+          withPos.push({ id: item.id, idx: pos.col * rows + pos.row });
+        } else {
+          newItems.push(item);
+        }
+      }
+      if (withPos.length === 0) {
+        all.sort(SORT_COMPARATORS[desktopSort]);
+        applyLayout(placeOnGrid(all, cols, rows));
+      } else {
+        withPos.sort((a, b) => a.idx - b.idx);
+        applyLayout(placeOnGrid([...withPos, ...newItems], cols, rows));
+      }
     } else {
-      const placed = autoPlace(allDesktopItems(), loadIconPositions(), gridSize.cols, gridSize.rows);
-      applyLayout(placed);
+      applyLayout(autoPlace(all, saved, cols, rows));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, isDesktop, items, gridSize, autoArrange, allDesktopItems, applyLayout]);

@@ -8,6 +8,7 @@ import FileExplorer from './FileExplorer';
 import type { IconDragInfo } from './constants';
 import Settings from './Settings';
 import Browser from './Browser';
+import Gallery from './Gallery';
 import { initDefaultFS, getAppForExtension, moveNodes, type FSNode } from './fileSystem';
 
 interface WindowState {
@@ -183,6 +184,9 @@ const AppWindow = memo(function AppWindow({
             allowFullScreen
             style={{ pointerEvents: isTop ? 'auto' : 'none' }}
           />
+        )}
+        {win.app.type === 'gallery' && (
+          <Gallery />
         )}
         {win.app.type === 'empty' && (
           <div className="h-full bg-zinc-900 flex flex-col items-center justify-center gap-2">

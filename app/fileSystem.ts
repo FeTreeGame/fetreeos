@@ -2,7 +2,7 @@ import { APPS } from './apps';
 
 const STORAGE_KEY = 'fetree-fs';
 const FS_VERSION_KEY = 'fetree-fs-version';
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 export const MAX_DEPTH = 4;
 
 export interface FSNode {

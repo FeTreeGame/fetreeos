@@ -2,7 +2,7 @@ export interface AppDef {
   id: string;
   title: string;
   icon: string;
-  type: 'browser' | 'notepad' | 'iframe' | 'explorer' | 'settings' | 'empty';
+  type: 'browser' | 'notepad' | 'iframe' | 'explorer' | 'settings' | 'gallery' | 'empty';
   defaultW?: number;
   defaultH?: number;
   url?: string;
@@ -19,6 +19,7 @@ export const APPS: AppDef[] = [
   // --- 콘텐츠 앱 ---
   { id: 'experience-space', title: 'Experience Space', icon: '🌌', type: 'iframe', url: 'https://experience-space.vercel.app' },
   { id: 'interactive-plains', title: 'Interactive Plains', icon: '🏜️', type: 'iframe', url: 'https://interactive-plains.vercel.app' },
+  { id: 'gallery', title: 'Gallery', icon: '🖼️', type: 'gallery' },
   { id: 'craft', title: 'Craft 3D', icon: '🔧', type: 'empty' },
   { id: 'viewer', title: 'GLB Viewer', icon: '📦', type: 'empty' },
   { id: 'music', title: 'Music', icon: '🎵', type: 'empty' },

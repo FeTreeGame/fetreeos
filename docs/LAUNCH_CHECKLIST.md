@@ -108,6 +108,7 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 
 - [x] `next build` 경고 0건 확인 (turbopack.root 경고도 홈 디렉토리 정리로 해소)
 - [x] TypeScript strict 에러 0건 확인
+- [x] Supabase 연동 — Interactive Plains 개발 DB 연결, Gallery 앱으로 artworks 조회 실증
 - [ ] 콘솔 에러/경고 정리
 - [ ] CLAUDE.md 작성 (프로젝트 규칙 문서)
 

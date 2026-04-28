@@ -76,7 +76,7 @@ export default function ContextMenu({
     return (
       <div className="fixed rounded shadow-xl" style={menuStyle} onClick={e => e.stopPropagation()}>
         <button onClick={() => onOpen(node)} className={btn}>열기</button>
-        {node.type !== 'app' && (<>
+        {node.type !== 'app' && node.type !== 'system' && (<>
           <button onClick={() => onRename(node)} className={btn}>이름 변경</button>
           {sep}
           <button onClick={() => onDelete(node.id)} className={btnDanger}>삭제</button>

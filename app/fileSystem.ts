@@ -2,13 +2,13 @@ import { APPS } from './apps';
 
 const STORAGE_KEY = 'fetree-fs';
 const FS_VERSION_KEY = 'fetree-fs-version';
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 6;
 export const MAX_DEPTH = 4;
 
 export interface FSNode {
   id: string;
   name: string;
-  type: 'file' | 'folder' | 'app';
+  type: 'file' | 'folder' | 'app' | 'system';
   parentId: string;
   extension?: string;
   content?: string;
@@ -30,7 +30,7 @@ export function getAppForExtension(ext?: string): string | null {
 
 export function getIconForNode(node: FSNode): string {
   if (node.icon) return node.icon;
-  if (node.type === 'app') return '📦';
+  if (node.type === 'app' || node.type === 'system') return '📦';
   if (node.type === 'folder') return '📁';
   if (node.extension === '.txt') return '📄';
   return '📎';
@@ -190,7 +190,7 @@ export function moveNodes(ids: string[], targetParentId: string): { moved: strin
     if (!node) { blocked.push(id); continue; }
     if (id === targetParentId) { blocked.push(id); continue; }
     if (isDescendant(id, targetParentId)) { blocked.push(id); continue; }
-    if (node.type === 'app' && isTrash) { blocked.push(id); continue; }
+    if ((node.type === 'app' || node.type === 'system') && isTrash) { blocked.push(id); continue; }
     if (!isTrash && targetDepth + 1 + getSubtreeDepth(id) > MAX_DEPTH) { blocked.push(id); continue; }
     node.parentId = targetParentId;
     node.updatedAt = now;
@@ -212,7 +212,7 @@ export function restoreFromTrash(id: string, targetParent = 'desktop'): void {
 export function deleteNode(id: string): void {
   let nodes = loadFS();
   const target = nodes.find(n => n.id === id);
-  if (target?.type === 'app') return;
+  if (target?.type === 'app' || target?.type === 'system') return;
   const toDelete = new Set<string>();
   const collect = (targetId: string) => {
     toDelete.add(targetId);
@@ -249,19 +249,19 @@ export function initDefaultFS(): void {
   if (version >= CURRENT_VERSION) return;
 
   const nodes = loadFS();
-  const existingAppIds = new Set(nodes.filter(n => n.type === 'app').map(n => n.appId));
-
   for (const app of APPS) {
-    const existing = nodes.find(n => n.type === 'app' && n.appId === app.id);
+    const nodeType = app.system ? 'system' : 'app';
+    const existing = nodes.find(n => (n.type === 'app' || n.type === 'system') && n.appId === app.id);
     if (existing) {
       existing.name = app.title;
       existing.icon = app.icon;
+      existing.type = nodeType;
       continue;
     }
     const node: FSNode = {
       id: `app-${app.id}`,
       name: app.title,
-      type: 'app',
+      type: nodeType,
       parentId: 'desktop',
       appId: app.id,
       icon: app.icon,

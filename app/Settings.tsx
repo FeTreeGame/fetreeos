@@ -33,6 +33,9 @@ export default function Settings({ onFSChange }: SettingsProps) {
     localStorage.removeItem('fetree-fs-version');
     localStorage.removeItem(ICON_POS_KEY);
     localStorage.removeItem('fetree-show-grid');
+    localStorage.removeItem('fetree-auto-arrange');
+    localStorage.removeItem('fetree-desktop-sort');
+    localStorage.removeItem('fetree-notes');
     initDefaultFS();
     onFSChange?.();
   };

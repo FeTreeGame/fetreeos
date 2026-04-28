@@ -102,13 +102,13 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
   const [iconPositions, setIconPositions] = useState<IconPositions>({});
   const [showGrid, setShowGrid] = useState(true);
-  const [autoArrange, setAutoArrange] = useState(false);
+  const [autoArrange, setAutoArrange] = useState(true);
   const [desktopSort, setDesktopSort] = useState<SortKey>('type');
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
-    setAutoArrange(localStorage.getItem('fetree-auto-arrange') === 'true');
+    setAutoArrange(localStorage.getItem('fetree-auto-arrange') !== 'false');
     setDesktopSort((localStorage.getItem('fetree-desktop-sort') as SortKey) || 'type');
     setItems(getChildren(initialFolderId));
     setHydrated(true);
@@ -130,7 +130,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   useEffect(() => {
     if (refreshKey !== undefined) {
       setItems(getChildren(currentFolder));
-      if (isDesktop) setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
+      if (isDesktop) {
+        setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
+        setAutoArrange(localStorage.getItem('fetree-auto-arrange') !== 'false');
+        setDesktopSort((localStorage.getItem('fetree-desktop-sort') as SortKey) || 'type');
+      }
       setIconDrag(null);
       setDropTarget(null);
     }
@@ -151,7 +155,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [isDesktop]);
 
   const allDesktopItems = useCallback((): ({ id: string } & Partial<FSNode>)[] => {
-    return [...items, { id: 'trash', name: '휴지통', type: 'folder' as const, createdAt: Infinity }];
+    return [...items, { id: TRASH_NODE.id, name: TRASH_NODE.name, type: TRASH_NODE.type, createdAt: Infinity }];
   }, [items]);
 
   const applyLayout = useCallback((positions: IconPositions) => {
@@ -180,12 +184,13 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   useEffect(() => {
     if (!hydrated || !isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
     if (autoArrange) {
-      compactLayout();
+      sortLayout();
     } else {
       const placed = autoPlace(allDesktopItems(), loadIconPositions(), gridSize.cols, gridSize.rows);
       applyLayout(placed);
     }
-  }, [hydrated, isDesktop, items, gridSize, autoArrange, allDesktopItems, compactLayout, applyLayout]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, isDesktop, items, gridSize, autoArrange, allDesktopItems, applyLayout]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);

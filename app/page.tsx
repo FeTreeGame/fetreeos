@@ -9,6 +9,7 @@ import type { IconDragInfo } from './constants';
 import Settings from './Settings';
 import Browser from './Browser';
 import Gallery from './Gallery';
+import MyComputer from './MyComputer';
 import { initDefaultFS, getAppForExtension, moveNodes, type FSNode } from './fileSystem';
 
 interface WindowState {
@@ -185,6 +186,9 @@ const AppWindow = memo(function AppWindow({
             style={{ pointerEvents: isTop ? 'auto' : 'none' }}
           />
         )}
+        {win.app.type === 'mycomputer' && (
+          <MyComputer />
+        )}
         {win.app.type === 'gallery' && (
           <Gallery />
         )}
@@ -271,7 +275,7 @@ export default function Home() {
   }, [topZIndex]);
 
   const openNode = useCallback((node: FSNode) => {
-    if (node.type === 'app' && node.appId) {
+    if ((node.type === 'app' || node.type === 'system') && node.appId) {
       const app = APPS.find(a => a.id === node.appId);
       if (app) { openApp(app); return; }
     }

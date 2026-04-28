@@ -11,7 +11,7 @@
 - [x] favicon — ICO 32x32 (~2.7KB) 적용. 향후 SVG 전환 + ICO 빌드 생성 예정 (TODO.md 에셋 최적화 철학 참조)
 - [x] 바탕화면 환영 파일 — "FeTree OS" → "FeTreeOS" 명칭 통일
 - [x] games/[slug]/page.tsx — "FeTreeGame" → "FeTreeOS" 반영
-- [ ] Vercel 프로젝트명 결정 (fetreeos → fetreeos.vercel.app)
+- [x] Vercel 프로젝트명 결정 — fetreeos.vercel.app
 
 ## 2. 버전 관리 체계
 
@@ -102,15 +102,15 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 - [x] iframe 앱들의 현재 접근 가능 여부 확인 — experience-space.vercel.app (200), interactive-plains.vercel.app (200)
 - [ ] 초기 진입 경험 — 처음 방문자가 뭘 보고 뭘 하게 되는가
 - [ ] 성능 — 모바일 브라우저에서 최소한 깨지지 않는지 (대응은 안 하더라도)
-- [ ] 에러 바운더리 — 예상치 못한 에러 시 흰 화면 방지
+- [x] 에러 바운더리 — global-error.tsx 추가 (복구 버튼 포함)
 
 ## 6. 코드 품질
 
 - [x] `next build` 경고 0건 확인 (turbopack.root 경고도 홈 디렉토리 정리로 해소)
 - [x] TypeScript strict 에러 0건 확인
 - [x] Supabase 연동 — Interactive Plains 개발 DB 연결, Gallery 앱으로 artworks 조회 실증
-- [ ] 콘솔 에러/경고 정리
-- [ ] CLAUDE.md 작성 (프로젝트 규칙 문서)
+- [x] 콘솔 에러/경고 정리 — 에러 없음 확인
+- [x] CLAUDE.md 작성 (프로젝트 규칙 문서)
 
 ## 7. 법적 / 라이센스 (결정 완료)
 
@@ -123,7 +123,7 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 근거: _ref 코드(ProzillaOS, daedalOS, Elara) 참조 경위 + 오픈소스 생태계 기여 의도
 
 - [x] LICENSE 파일 생성 (MIT + 브랜딩 제외 조항)
-- [ ] iframe 임베드 프로젝트가 본인 소유인지 확인
+- [x] iframe 임베드 프로젝트가 본인 소유인지 확인 — Experience Space, Interactive Plains 모두 FeTreeGame 소유. 오픈소스 참조 시 MIT 라이선스 준수
 
 ## 8. 런칭 후 모니터링
 

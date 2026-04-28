@@ -19,6 +19,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - system 노드 타입 — Settings, 휴지통을 시스템 아이콘으로 분류 (정렬 최상위)
 - APP_VERSION 환경변수 — package.json version을 빌드 시 주입
 - Notepad 테마 전환 — Theme 탭으로 Dark/Light 선택 (기본 Light)
+- Alert 다이얼로그 — 연결 앱이 없는 파일 열기 시 경고 표시
 
 ### Changed
 - Notepad 파일 생성 지연 — 열기 시 메모리만 사용, Save 시에만 파일 생성
@@ -36,3 +37,5 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 전체 초기화 — autoArrange, desktopSort, notes 키 누락 + state 리로드 추가
 - 타이틀바 더블클릭 전체화면/복원 미작동 — setPointerCapture가 dblclick 이벤트 차단
 - 전체화면 복원 시 포커스 해제 — 창 축소 후 바탕화면 click 전파로 focusedId 초기화
+- 휴지통이 Notepad로 열리는 문제 — trash를 explorer로 열도록 수정
+- 미연결 파일 fallback이 Notepad이던 문제 — Alert 다이얼로그로 변경

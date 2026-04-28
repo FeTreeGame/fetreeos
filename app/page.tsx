@@ -221,6 +221,7 @@ export default function Home() {
   const desktopRef = useRef<HTMLDivElement>(null);
   const [iconDragInfo, setIconDragInfo] = useState<IconDragInfo | null>(null);
   const [crossDropTarget, setCrossDropTarget] = useState<string | null>(null);
+  const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   const topZIndex = useCallback(() => {
     return ++zCounter;
@@ -275,7 +276,7 @@ export default function Home() {
       const app = APPS.find(a => a.id === node.appId);
       if (app) { openApp(app); return; }
     }
-    if (node.type === 'folder') {
+    if (node.type === 'folder' || node.id === 'trash') {
       const explorer = APPS.find(a => a.type === 'explorer');
       if (explorer) { openApp(explorer, node.id); return; }
     }
@@ -284,8 +285,7 @@ export default function Home() {
       const app = APPS.find(a => a.type === appType);
       if (app) { openApp(app, node.id); return; }
     }
-    const notepad = APPS.find(a => a.type === 'notepad');
-    if (notepad) openApp(notepad, node.id);
+    setAlertMsg(`"${node.name}"을(를) 열 수 있는 앱이 없습니다.`);
   }, [openApp]);
 
   const [fsRevision, setFsRevision] = useState(0);
@@ -598,6 +598,30 @@ export default function Home() {
             </span>
           </div>
         ))}
+
+        {/* Alert Dialog */}
+        {alertMsg && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20000 }}>
+            <div className="absolute inset-0 bg-black/40" onClick={() => setAlertMsg(null)} />
+            <div
+              className="relative w-72 rounded-lg shadow-2xl overflow-hidden"
+              style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.15)' }}
+            >
+              <div className="flex items-center px-3 py-2 bg-zinc-800 border-b border-zinc-700">
+                <span className="text-xs text-white/80 font-bold flex-1">FeTreeOS</span>
+              </div>
+              <div className="px-4 py-5">
+                <p className="text-xs text-white/70 leading-relaxed">{alertMsg}</p>
+              </div>
+              <div className="flex justify-end px-3 py-2 border-t border-zinc-700">
+                <button
+                  onClick={() => setAlertMsg(null)}
+                  className="px-4 py-1 rounded text-xs bg-zinc-700 text-white/80 hover:bg-zinc-600"
+                >OK</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Taskbar */}

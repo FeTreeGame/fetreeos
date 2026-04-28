@@ -5,17 +5,18 @@
 
 ## 1. 브랜딩 반영
 
-- [ ] package.json — name, version(0.1.0), description 갱신
-- [ ] layout.tsx — `<title>`, `<meta>` 태그에 FeTreeOS 반영
-- [ ] OG 메타태그 — 공유 시 표시될 제목/설명/이미지
+- [x] package.json — name → "fetreeos", version 0.1.0 확인
+- [x] layout.tsx — `<title>`, `<meta>` 태그에 FeTreeOS 반영
+- [x] OG 메타태그 — title, description, siteName 추가 (이미지는 로고 확정 후)
 - [ ] favicon — FeTreeOS 로고 또는 임시 아이콘
-- [ ] 바탕화면 환영 파일 — "FeTree OS" → "FeTreeOS" 명칭 통일
+- [x] 바탕화면 환영 파일 — "FeTree OS" → "FeTreeOS" 명칭 통일
+- [x] games/[slug]/page.tsx — "FeTreeGame" → "FeTreeOS" 반영
 - [ ] Vercel 프로젝트명 결정 (fetreeos → fetreeos.vercel.app)
 
 ## 2. 버전 관리 체계
 
-- [ ] package.json version: "0.1.0" (MVP 시작점)
-- [ ] CHANGELOG.md 생성 — SemVer 기반, [Unreleased] 섹션 운용
+- [x] package.json version: "0.1.0" (MVP 시작점)
+- [x] CHANGELOG.md 생성 — SemVer 기반, [Unreleased] 섹션 운용
 - [ ] fetree-fs-version — 현재 값(3) 유지, 향후 변경 시 순차 마이그레이션 구조 확인
 
 ### 마이그레이션 체인 구조 (조사 필요)
@@ -43,6 +44,7 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 - 브라우저 초기화/변경 시 데이터 소실
 - 시크릿 모드에서는 세션 종료 시 삭제
 - 용량 제한 (~5MB, 브라우저별 상이)
+- 사용자 설정(자동정렬 등)도 localStorage 기반 — 다른 브라우저/시크릿 창에서는 초기값으로 시작됨. 버그 아님, Supabase 계정 동기화로 해결 예정
 
 ### 대응책 (조사 후 구현 판단)
 
@@ -97,15 +99,15 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 
 ### 검토 필요
 
-- [ ] iframe 앱들의 현재 접근 가능 여부 확인 (배포 URL 유효한지)
+- [x] iframe 앱들의 현재 접근 가능 여부 확인 — experience-space.vercel.app (200), interactive-plains.vercel.app (200)
 - [ ] 초기 진입 경험 — 처음 방문자가 뭘 보고 뭘 하게 되는가
 - [ ] 성능 — 모바일 브라우저에서 최소한 깨지지 않는지 (대응은 안 하더라도)
 - [ ] 에러 바운더리 — 예상치 못한 에러 시 흰 화면 방지
 
 ## 6. 코드 품질
 
-- [ ] `next build` 경고 0건 확인
-- [ ] TypeScript strict 에러 0건 확인
+- [x] `next build` 경고 0건 확인 (turbopack.root 경고도 홈 디렉토리 정리로 해소)
+- [x] TypeScript strict 에러 0건 확인
 - [ ] 콘솔 에러/경고 정리
 - [ ] CLAUDE.md 작성 (프로젝트 규칙 문서)
 
@@ -119,7 +121,7 @@ for (let v = savedVersion; v < CURRENT_VERSION; v++) {
 
 근거: _ref 코드(ProzillaOS, daedalOS, Elara) 참조 경위 + 오픈소스 생태계 기여 의도
 
-- [ ] LICENSE 파일 생성 (MIT + 브랜딩 제외 조항)
+- [x] LICENSE 파일 생성 (MIT + 브랜딩 제외 조항)
 - [ ] iframe 임베드 프로젝트가 본인 소유인지 확인
 
 ## 8. 런칭 후 모니터링

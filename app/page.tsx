@@ -185,8 +185,10 @@ const AppWindow = memo(function AppWindow({
           />
         )}
         {win.app.type === 'empty' && (
-          <div className="h-full bg-zinc-900 flex items-center justify-center">
-            <span className="text-zinc-500 text-sm">{win.app.title}</span>
+          <div className="h-full bg-zinc-900 flex flex-col items-center justify-center gap-2">
+            <span className="text-zinc-400 text-lg">{win.app.icon}</span>
+            <span className="text-zinc-400 font-medium">{win.app.title}</span>
+            <span className="text-zinc-600 text-sm">Coming Soon</span>
           </div>
         )}
       </div>

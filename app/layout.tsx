@@ -13,8 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FeTreeGame",
-  description: "2D Games & Creative Tools",
+  title: "FeTreeOS",
+  description: "Web-based creative OS — make, play, and share in your browser.",
+  openGraph: {
+    title: "FeTreeOS",
+    description: "Web-based creative OS — make, play, and share in your browser.",
+    siteName: "FeTreeOS",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

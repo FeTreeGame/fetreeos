@@ -279,7 +279,7 @@ export function initDefaultFS(): void {
       type: 'file',
       parentId: 'desktop',
       extension: ext,
-      content: '이곳은 FeTree OS입니다.\n자유롭게 파일을 만들고 정리해보세요.',
+      content: '이곳은 FeTreeOS입니다.\n자유롭게 파일을 만들고 정리해보세요.',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

@@ -83,7 +83,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
         <div className="flex h-14 items-center px-4 gap-4">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-600 text-xs font-bold text-white">F</div>
-            <span className="font-bold text-lg hidden sm:block">FeTreeGame</span>
+            <span className="font-bold text-lg hidden sm:block">FeTreeOS</span>
           </Link>
           <div className="flex-1 max-w-2xl mx-auto px-4">
             <div className="flex">
@@ -128,7 +128,7 @@ export default async function GamePage({ params }: { params: Promise<{ slug: str
                   {game.title[0]}
                 </div>
                 <div>
-                  <span className="text-sm text-zinc-300">FeTreeGame</span>
+                  <span className="text-sm text-zinc-300">FeTreeOS</span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">{game.category}</span>
                     <span className="text-xs text-zinc-500">{game.description}</span>

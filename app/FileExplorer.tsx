@@ -178,14 +178,14 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [allDesktopItems, gridSize, applyLayout]);
 
   useEffect(() => {
-    if (!isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
+    if (!hydrated || !isDesktop || (gridSize.cols <= 1 && gridSize.rows <= 1)) return;
     if (autoArrange) {
       compactLayout();
     } else {
       const placed = autoPlace(allDesktopItems(), loadIconPositions(), gridSize.cols, gridSize.rows);
       applyLayout(placed);
     }
-  }, [isDesktop, items, gridSize, autoArrange, allDesktopItems, compactLayout, applyLayout]);
+  }, [hydrated, isDesktop, items, gridSize, autoArrange, allDesktopItems, compactLayout, applyLayout]);
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);

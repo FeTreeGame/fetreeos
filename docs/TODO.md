@@ -566,6 +566,19 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 - P3: 아이콘 드래그 중 setState 3개 동시 갱신 (iconDrag, dropTarget, selectedIds) — React 18 배칭으로 1회 합산되지만 구조적 비용
 - P4: 그리드 디버그 오버레이 cols×rows div 매 렌더 생성 — 디버그 전용이므로 낮음
 
+### P5: FSNode 저장 용량 최적화 (후순위 — Supabase 전환 전후)
+
+닌텐도식 제약=양식 사고. 줄일 수 있는 건 줄인다.
+
+**현재 상태**: 노드당 ~180-200바이트 + content. 초기 ~15노드 = ~3-4KB. localStorage 5MB 한도 내 여유.
+
+**최적화 방향**:
+- 타임스탬프 압축 — Unix epoch 13자리 → base36 변환(8자리) 또는 기준 시점 오프셋(4자리)
+- 키 이름 단축 — JSON 직렬화 시 `parentId` → `p`, `createdAt` → `c` 등 (읽기 시 복원)
+- content 압축 — LZ-string 등 경량 압축 (텍스트 특성상 50-70% 축소 기대)
+- 중앙 타임스탬프 — 세션 시작 시각 기준 상대값 저장 (초 단위, 2바이트면 18시간 커버)
+- 불변 필드 분리 — id/type/appId 등 변하지 않는 필드를 별도 인덱스로 관리, 노드에는 참조만
+
 ## ✅ 완료 — ref + rAF 전환 (P2(b))
 
 드래그/리사이즈/스냅 전체를 setState 기반에서 ref + DOM 직접 갱신으로 일괄 전환. 상세: `docs/RAF_MIGRATION_PLAN.md`

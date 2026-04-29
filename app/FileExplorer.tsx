@@ -102,7 +102,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [subMenu, setSubMenu] = useState<'create' | 'sort' | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [trashProps, setTrashProps] = useState<FSNode | null>(null);
+  const [propsNode, setPropsNode] = useState<FSNode | null>(null);
   const [restoreConflict, setRestoreConflict] = useState<{ id: string; target: string; names: string[] } | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -262,7 +262,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   const handleDoubleClick = useCallback((node: FSNode) => {
     if (currentFolder === 'trash') {
-      setTrashProps(node);
+      setPropsNode(node);
       return;
     }
     if (node.type === 'folder' && !isDesktop) {
@@ -325,12 +325,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (conflicts.length > 0) {
       setRestoreConflict({ id, target, names: conflicts.map(cid => getNode(cid)?.name ?? cid) });
       setContextMenu(null);
-      setTrashProps(null);
+      setPropsNode(null);
       return;
     }
     restoreFromTrash(id, target);
     setContextMenu(null);
-    setTrashProps(null);
+    setPropsNode(null);
     refresh();
   }, [refresh]);
 
@@ -692,6 +692,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           onNewFile={handleNewFile}
           onNewFolder={handleNewFolder}
           onEmptyTrash={() => { emptyTrash(); refresh(); setContextMenu(null); }}
+          onProperties={(node) => { setPropsNode(node); setContextMenu(null); }}
           onToggleAutoArrange={() => {
             const next = !autoArrange;
             setAutoArrange(next);
@@ -707,41 +708,40 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       )}
 
       {/* Trash item properties dialog */}
-      {trashProps && (() => {
-        const typeLabel = trashProps.type === 'folder' ? '폴더' : trashProps.type === 'file' ? '파일' : trashProps.type;
-        const originPath = trashProps.deletedFrom
-          ? getPath(trashProps.deletedFrom).map(s => s.name).join(' > ')
-          : 'Desktop';
+      {propsNode && (() => {
+        const isInTrash = currentFolder === 'trash';
+        const typeLabels: Record<string, string> = { folder: '폴더', file: '파일', app: '앱', system: '시스템' };
+        const typeLabel = typeLabels[propsNode.type] ?? propsNode.type;
+        const locationPath = isInTrash
+          ? (propsNode.deletedFrom ? getPath(propsNode.deletedFrom).map(s => s.name).join(' > ') : 'Desktop')
+          : getPath(propsNode.parentId).map(s => s.name).join(' > ');
         const fmt = (ts?: number) => {
           if (!ts) return '-';
           const d = new Date(ts);
           return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         };
+        const buttons = isInTrash
+          ? [{ label: '복원', variant: 'primary' as const, onClick: () => handleRestore(propsNode.id) }, { label: '닫기', onClick: () => setPropsNode(null) }]
+          : [{ label: '확인', onClick: () => setPropsNode(null) }];
         return (
-          <Dialog
-            title={`${trashProps.name} 속성`}
-            onClose={() => setTrashProps(null)}
-            buttons={[
-              {
-                label: '복원', variant: 'primary',
-                onClick: () => handleRestore(trashProps.id),
-              },
-              { label: '닫기', onClick: () => setTrashProps(null) },
-            ]}
-          >
+          <Dialog title={`${propsNode.name} 속성`} onClose={() => setPropsNode(null)} buttons={buttons}>
             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-zinc-700">
-              <span className="text-2xl">{getIconForNode(trashProps)}</span>
-              <span className="text-sm text-white/90 font-medium truncate">{trashProps.name}</span>
+              <span className="text-2xl">{getIconForNode(propsNode)}</span>
+              <span className="text-sm text-white/90 font-medium truncate">{propsNode.name}</span>
             </div>
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
               <span className="text-white/40">종류:</span>
-              <span className="text-white/70">{typeLabel}{trashProps.extension ? ` (${trashProps.extension})` : ''}</span>
-              <span className="text-white/40">원본:</span>
-              <span className="text-white/70 truncate">{originPath}</span>
-              <span className="text-white/40 mt-2">삭제한 날짜:</span>
-              <span className="text-white/70 mt-2">{fmt(trashProps.deletedAt)}</span>
-              <span className="text-white/40">만든 날짜:</span>
-              <span className="text-white/70">{fmt(trashProps.createdAt)}</span>
+              <span className="text-white/70">{typeLabel}{propsNode.extension ? ` (${propsNode.extension})` : ''}</span>
+              <span className="text-white/40">{isInTrash ? '원본:' : '위치:'}</span>
+              <span className="text-white/70 truncate">{locationPath}</span>
+              {isInTrash && (<>
+                <span className="text-white/40 mt-2">삭제한 날짜:</span>
+                <span className="text-white/70 mt-2">{fmt(propsNode.deletedAt)}</span>
+              </>)}
+              <span className={`text-white/40 ${!isInTrash ? 'mt-2' : ''}`}>만든 날짜:</span>
+              <span className={`text-white/70 ${!isInTrash ? 'mt-2' : ''}`}>{fmt(propsNode.createdAt)}</span>
+              <span className="text-white/40">수정한 날짜:</span>
+              <span className="text-white/70">{fmt(propsNode.updatedAt)}</span>
             </div>
           </Dialog>
         );

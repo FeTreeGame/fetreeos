@@ -22,6 +22,7 @@ interface ContextMenuProps {
   onNewFile: () => void;
   onNewFolder: () => void;
   onEmptyTrash: () => void;
+  onProperties: (node: FSNode) => void;
   onToggleAutoArrange: () => void;
   onDesktopSort: (key: SortKey) => void;
   onExplorerSort: (key: SortKey) => void;
@@ -35,7 +36,7 @@ export default function ContextMenu({
   x, y, node, currentFolder, isDesktop,
   autoArrange, desktopSort, explorerSort, subMenu,
   onClose, onOpen, onDelete, onPermanentDelete, onRestore, onRename,
-  onNewFile, onNewFolder, onEmptyTrash,
+  onNewFile, onNewFolder, onEmptyTrash, onProperties,
   onToggleAutoArrange, onDesktopSort, onExplorerSort, onRefresh, onSubMenu,
 }: ContextMenuProps) {
   const menuStyle = {
@@ -71,6 +72,8 @@ export default function ContextMenu({
         <button onClick={() => onRestore(node.id)} className={btn}>복원</button>
         {sep}
         <button onClick={() => onPermanentDelete(node.id)} className={btnDanger}>완전 삭제</button>
+        {sep}
+        <button onClick={() => onProperties(node)} className={btn}>속성</button>
       </div>
     );
     return (
@@ -81,6 +84,8 @@ export default function ContextMenu({
           {sep}
           <button onClick={() => onDelete(node.id)} className={btnDanger}>삭제</button>
         </>)}
+        {sep}
+        <button onClick={() => onProperties(node)} className={btn}>속성</button>
       </div>
     );
   }

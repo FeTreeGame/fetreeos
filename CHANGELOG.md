@@ -6,11 +6,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 ## [Unreleased]
 
 ### Added
+- 범용 속성 다이얼로그 — 컨텍스트 메뉴 "속성" 항목으로 모든 파일/폴더/앱 속성 표시 (종류, 위치, 만든/수정 날짜). 휴지통 항목은 원본 위치 + 삭제 날짜 + 복원 버튼 추가
 - 드래그→휴지통 삭제 차단 — 열린 파일을 드래그로 휴지통에 드롭 시 Alert 차단
 - 복원 충돌 다이얼로그 — 원본 위치에 동명 파일 존재 시 건너뛰기/덮어쓰기/다른 이름 선택
 - 모달 다이얼로그 — Dialog에 modal prop 추가, 충돌 다이얼로그 외부 클릭 차단
 - 휴지통 빈 메시지 — '빈 폴더입니다' 대신 '휴지통이 비어 있습니다' 표시
-- 휴지통 속성 다이얼로그 — 더블클릭 시 종류/원본/삭제날짜/만든날짜 표시 + 복원 버튼
 - 삭제 메타데이터 — FSNode에 deletedFrom/deletedAt 필드, moveNodes에서 trash 이동 시 기록
 - 삭제 시 상위 폴더 복귀 — 삭제된 폴더를 보던 탐색기가 deletedFrom 체인으로 첫 alive 조상 이동
 - 복원 시 원래 위치 — 컨텍스트 메뉴/속성 다이얼로그 복원이 deletedFrom 원본 위치 사용

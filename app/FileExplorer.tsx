@@ -141,15 +141,12 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     if (refreshKey !== undefined) {
       if (!isDesktop && currentFolder !== 'desktop' && currentFolder !== 'trash' && !isFolderAlive(currentFolder)) {
         let fallback = 'desktop';
-        const node = getNode(currentFolder);
-        if (node) {
-          let parentId = node.parentId;
-          while (parentId && parentId !== 'desktop' && parentId !== 'trash') {
-            if (isFolderAlive(parentId)) { fallback = parentId; break; }
-            const parent = getNode(parentId);
-            if (!parent) break;
-            parentId = parent.parentId;
-          }
+        let cur = getNode(currentFolder);
+        for (let i = 0; i < 10 && cur; i++) {
+          const target = cur.deletedFrom ?? (cur.parentId !== 'trash' ? cur.parentId : null);
+          if (!target) break;
+          if (target === 'desktop' || isFolderAlive(target)) { fallback = target; break; }
+          cur = getNode(target);
         }
         setCurrentFolder(fallback);
         setHistory(prev => [...prev.slice(0, historyIdx + 1), fallback]);
@@ -673,7 +670,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           onOpen={(node) => { if (node.id === 'trash') onOpenFile?.(TRASH_NODE); else { handleDoubleClick(node); } setContextMenu(null); }}
           onDelete={(id) => { handleDelete(id); }}
           onPermanentDelete={(id) => { deleteNode(id); setContextMenu(null); refresh(); }}
-          onRestore={(id) => { moveNodes([id], 'desktop'); setContextMenu(null); refresh(); }}
+          onRestore={(id) => { const n = getNode(id); restoreFromTrash(id, n?.deletedFrom ?? 'desktop'); setContextMenu(null); refresh(); }}
           onRename={(node) => startRename(node)}
           onNewFile={handleNewFile}
           onNewFolder={handleNewFolder}

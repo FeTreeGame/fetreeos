@@ -585,6 +585,10 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 - [x] 메모장 최초 실행 시 파일 2중 생성 — StrictMode 이중 useEffect 방어(initialized ref) + onFSChange 누락 수정
 - [x] 바탕화면 새 파일/폴더 생성 위치 — useEffect에서 sort 분리, 명시적 새로고침 모델 도입. 새 파일은 항상 끝에 배치
 - [x] 리팩터링 — 배치 로직 헬퍼 추출(allDesktopItems, applyLayout, compactLayout), sortLayout 통합, useDesktopDrag placeOnGrid 재사용
+- [x] 포커스 승계 — 창 닫기/최소화 시 z-order 최상위 창으로 포커스 자동 이동
+- [x] singleInstance 플래그 — 앱별 다중 창 허용 여부 제어 (Settings, MyComputer: 앱 레벨, 휴지통: fileId 레벨)
+- [x] 파일/폴더 다중 창 열기 — fileId 중복 체크 제거 (클래식 Windows 동작)
+- [x] 메모장 다중 창 저장 시 동명 파일 버그 — createFile 후 title을 실제 생성된 node.name으로 동기화
 
 ## ✅ 완료 — 고유파일 규칙 + 이동 충돌 다이얼로그
 

@@ -8,17 +8,18 @@ export interface AppDef {
   url?: string;
   text?: string;
   system?: boolean;
+  singleInstance?: boolean;
 }
 
 export const APPS: AppDef[] = [
   // --- 시스템 ---
-  { id: 'mycomputer', title: 'My Computer', icon: '💻', type: 'mycomputer', system: true },
+  { id: 'mycomputer', title: 'My Computer', icon: '💻', type: 'mycomputer', system: true, singleInstance: true },
 
   // --- 기본 앱 ---
   { id: 'explorer', title: 'File Explorer', icon: '📂', type: 'explorer' },
   { id: 'browser', title: 'Internet', icon: '🌐', type: 'browser' },
   { id: 'notepad', title: 'Notes', icon: '📝', type: 'notepad' },
-  { id: 'settings', title: 'Settings', icon: '⚙️', type: 'settings', system: true },
+  { id: 'settings', title: 'Settings', icon: '⚙️', type: 'settings', system: true, singleInstance: true },
 
   // --- 콘텐츠 앱 ---
   { id: 'experience-space', title: 'Experience Space', icon: '🌌', type: 'iframe', url: 'https://experience-space.vercel.app' },

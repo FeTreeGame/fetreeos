@@ -51,6 +51,7 @@ export default function Notepad({ fileId, onFSChange }: NotepadProps) {
     } else {
       const node = createFile('desktop', title, content);
       setCurrentFileId(node.id);
+      setTitle(node.name);
       onFSChange?.();
     }
   }, [currentFileId, content, title, onFSChange]);

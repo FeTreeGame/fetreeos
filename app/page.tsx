@@ -33,15 +33,12 @@ export default function Home() {
     const desktop = desktopRef.current;
     const dw = desktop?.clientWidth ?? 800;
     const dh = desktop?.clientHeight ?? 600;
+    const singleFileId = fileId === 'trash' ? 'trash' : undefined;
     setWindows(prev => {
-      if (!fileId) {
-        const existing = prev.find(w => w.app.id === app.id && !w.fileId);
-        if (existing) {
-          setFocusedId(existing.id);
-          return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
-        }
-      } else {
-        const existing = prev.find(w => w.fileId === fileId);
+      if (app.singleInstance || singleFileId) {
+        const existing = singleFileId
+          ? prev.find(w => w.fileId === singleFileId)
+          : prev.find(w => w.app.id === app.id);
         if (existing) {
           setFocusedId(existing.id);
           return prev.map(w => w.id === existing.id ? { ...w, minimized: false, zIndex: topZIndex() } : w);
@@ -100,12 +97,29 @@ export default function Home() {
   }, [refreshDesktop]);
 
   const closeWindow = useCallback((id: string) => {
-    setWindows(prev => prev.filter(w => w.id !== id));
-    setFocusedId(prev => prev === id ? null : prev);
+    setWindows(prev => {
+      const remaining = prev.filter(w => w.id !== id);
+      setFocusedId(fid => {
+        if (fid !== id) return fid;
+        const visible = remaining.filter(w => !w.minimized);
+        if (visible.length === 0) return null;
+        return visible.reduce((a, b) => a.zIndex > b.zIndex ? a : b).id;
+      });
+      return remaining;
+    });
   }, []);
 
   const minimizeWindow = useCallback((id: string) => {
-    setWindows(prev => prev.map(w => w.id === id ? { ...w, minimized: true } : w));
+    setWindows(prev => {
+      const updated = prev.map(w => w.id === id ? { ...w, minimized: true } : w);
+      setFocusedId(fid => {
+        if (fid !== id) return fid;
+        const visible = updated.filter(w => !w.minimized);
+        if (visible.length === 0) return null;
+        return visible.reduce((a, b) => a.zIndex > b.zIndex ? a : b).id;
+      });
+      return updated;
+    });
   }, []);
 
   const focusWindow = useCallback((id: string) => {

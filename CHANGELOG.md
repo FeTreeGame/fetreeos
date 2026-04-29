@@ -22,6 +22,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - Alert 다이얼로그 — 연결 앱이 없는 파일 열기 시 경고 표시
 - 고유파일 규칙 — uniqueName() 헬퍼, 생성/이동 시 자동 넘버링 (새 메모.txt → 새 메모 (2).txt)
 - 이동 충돌 다이얼로그 — 같은 이름 파일 존재 시 건너뛰기/덮어쓰기/다른 이름 선택
+- singleInstance 플래그 — 앱별 다중 창 허용 여부 제어 (Settings, MyComputer, 휴지통: 싱글)
+- 포커스 승계 — 창 닫기/최소화 시 z-order 최상위 창으로 포커스 자동 이동
+- 파일/폴더 다중 창 열기 — 같은 파일/폴더를 여러 창으로 열 수 있도록 변경 (클래식 Windows 동작)
 
 ### Changed
 - page.tsx 분리 — 805줄 → 342줄. windowTypes.ts, AppWindow.tsx, Dialog.tsx, Taskbar.tsx, useWindowDrag.ts 5개 파일 추출
@@ -50,3 +53,4 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 자동정렬 시 새 파일이 정렬 순서 중간에 삽입되던 문제 — 기존 위치 유지 + 새 아이템 말미 배치 복원 (fb0c122 후퇴 수정), 최초 접속 시에는 정렬 기준 배치
 - Gallery DetailView z-index가 리사이즈 핸들을 가리던 문제 — z-10 제거
 - 최초 진입 시 아이콘이 정렬 기준을 무시하고 FS 순서로 배치되던 문제 — items 빈 배열 상태에서 TRASH_NODE만으로 layout effect가 선행 실행되어 PRESERVE 분기 진입. items.length === 0 가드 추가
+- 메모장 다중 창 저장 시 동명 파일 생성 — createFile 후 uniqueName 적용된 실제 이름으로 title 미동기화. setTitle(node.name) 추가

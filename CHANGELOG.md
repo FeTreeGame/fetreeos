@@ -20,6 +20,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - APP_VERSION 환경변수 — package.json version을 빌드 시 주입
 - Notepad 테마 전환 — Theme 탭으로 Dark/Light 선택 (기본 Light)
 - Alert 다이얼로그 — 연결 앱이 없는 파일 열기 시 경고 표시
+- 고유파일 규칙 — uniqueName() 헬퍼, 생성/이동 시 자동 넘버링 (새 메모.txt → 새 메모 (2).txt)
+- 이동 충돌 다이얼로그 — 같은 이름 파일 존재 시 건너뛰기/덮어쓰기/다른 이름 선택
 
 ### Changed
 - 드래그/리사이즈 엔진 — setState 기반에서 ref + DOM 직접 갱신으로 전환 (드래그 중 React 리렌더 0회)

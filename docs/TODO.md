@@ -585,12 +585,17 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 - [x] 바탕화면 새 파일/폴더 생성 위치 — useEffect에서 sort 분리, 명시적 새로고침 모델 도입. 새 파일은 항상 끝에 배치
 - [x] 리팩터링 — 배치 로직 헬퍼 추출(allDesktopItems, applyLayout, compactLayout), sortLayout 통합, useDesktopDrag placeOnGrid 재사용
 
+## ✅ 완료 — 고유파일 규칙 + 이동 충돌 다이얼로그
+
+- [x] 파일명 유니크 규칙 — `uniqueName(parentId, name)` 헬퍼. 생성 시 자동 넘버링 (`새 메모.txt` → `새 메모 (2).txt`). createFile/createFolder에 적용
+- [x] 크로스 드래그 유니크 처리 — moveNodes의 rename 모드에서 동일 로직 적용
+- [x] 이동 충돌 다이얼로그 — `checkMoveConflicts()` + 3버튼 다이얼로그 (건너뛰기/덮어쓰기/다른 이름). moveNodes에 `MoveConflictMode` 파라미터 추가
+
 ## 미착수
 
-### 고유파일 규칙 + 확인 패턴
+### 잔여 확인 패턴
 
-- [ ] 파일명 유니크 규칙 — 같은 폴더 내 동일 이름+확장자 중복 불허. 생성 시 자동 넘버링 (`새 메모.txt` → `새 메모 (2).txt`). 파일과 폴더 모두 적용
-- [ ] 이동/복사 충돌 시 확인 다이얼로그 — 덮어쓰기 / 건너뛰기 / 이름 변경 선택. Windows 패턴 준용
+- [ ] 인라인 이름 변경(rename) 시 중복 체크 — updateNode에서 같은 폴더 내 동명 파일 거부
 - [ ] 메모장 지연 생성 — Save 전까지 FS에 파일 미생성 (currentFileId: null 상태에서 메모리에만 content 보유). 닫기 시 "저장하시겠습니까?" 확인
 
 ### 기타

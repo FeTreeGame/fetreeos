@@ -10,7 +10,7 @@ import Settings from './Settings';
 import Browser from './Browser';
 import Gallery from './Gallery';
 import MyComputer from './MyComputer';
-import { initDefaultFS, getAppForExtension, moveNodes, type FSNode } from './fileSystem';
+import { initDefaultFS, getAppForExtension, moveNodes, checkMoveConflicts, getNode, type FSNode, type MoveConflictMode } from './fileSystem';
 
 interface WindowState {
   id: string;
@@ -223,6 +223,7 @@ export default function Home() {
   const [iconDragInfo, setIconDragInfo] = useState<IconDragInfo | null>(null);
   const [crossDropTarget, setCrossDropTarget] = useState<string | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
+  const [moveConflict, setMoveConflict] = useState<{ ids: string[]; target: string; names: string[] } | null>(null);
 
   const topZIndex = useCallback(() => {
     return ++zCounter;
@@ -522,6 +523,21 @@ export default function Home() {
         }
       }
       if (targetFolder && targetFolder !== iconDragInfo.sourceFolder) {
+        if (targetFolder !== 'trash') {
+          const conflicts = checkMoveConflicts(iconDragInfo.ids, targetFolder);
+          if (conflicts.length > 0) {
+            const nodes = iconDragInfo.ids.map(id => {
+              const el = document.querySelector(`[data-node-id="${id}"]`);
+              return el?.getAttribute('data-node-name') ?? id;
+            });
+            setMoveConflict({ ids: iconDragInfo.ids, target: targetFolder, names: conflicts.map(id => {
+              return getNode(id)?.name ?? id;
+            })});
+            setIconDragInfo(null);
+            setCrossDropTarget(null);
+            return;
+          }
+        }
         moveNodes(iconDragInfo.ids, targetFolder);
         refreshDesktop();
         if (topWinEl) {
@@ -666,6 +682,57 @@ export default function Home() {
                   onClick={() => setAlertMsg(null)}
                   className="px-4 py-1 rounded text-xs bg-zinc-700 text-white/80 hover:bg-zinc-600"
                 >OK</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Move Conflict Dialog */}
+        {moveConflict && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20000 }}>
+            <div className="absolute inset-0 bg-black/40" onClick={() => setMoveConflict(null)} />
+            <div
+              className="relative w-80 rounded-lg shadow-2xl overflow-hidden"
+              style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.15)' }}
+            >
+              <div className="flex items-center px-3 py-2 bg-zinc-800 border-b border-zinc-700">
+                <span className="text-xs text-white/80 font-bold flex-1">파일 충돌</span>
+              </div>
+              <div className="px-4 py-4">
+                <p className="text-xs text-white/70 leading-relaxed mb-2">
+                  대상 폴더에 같은 이름의 항목이 있습니다:
+                </p>
+                <ul className="text-xs text-white/60 mb-1 max-h-24 overflow-y-auto">
+                  {moveConflict.names.map((name, i) => (
+                    <li key={i} className="truncate">• {name}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex justify-end gap-1.5 px-3 py-2 border-t border-zinc-700">
+                <button
+                  onClick={() => {
+                    moveNodes(moveConflict.ids, moveConflict.target, 'skip');
+                    refreshDesktop();
+                    setMoveConflict(null);
+                  }}
+                  className="px-3 py-1 rounded text-xs bg-zinc-700 text-white/80 hover:bg-zinc-600"
+                >건너뛰기</button>
+                <button
+                  onClick={() => {
+                    moveNodes(moveConflict.ids, moveConflict.target, 'overwrite');
+                    refreshDesktop();
+                    setMoveConflict(null);
+                  }}
+                  className="px-3 py-1 rounded text-xs bg-red-800/80 text-white/80 hover:bg-red-700/80"
+                >덮어쓰기</button>
+                <button
+                  onClick={() => {
+                    moveNodes(moveConflict.ids, moveConflict.target, 'rename');
+                    refreshDesktop();
+                    setMoveConflict(null);
+                  }}
+                  className="px-3 py-1 rounded text-xs bg-blue-700/80 text-white/80 hover:bg-blue-600/80"
+                >다른 이름</button>
               </div>
             </div>
           </div>

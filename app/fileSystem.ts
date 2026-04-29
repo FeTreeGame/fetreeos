@@ -111,11 +111,26 @@ export function getDepth(parentId: string): number {
   return depth;
 }
 
+export function uniqueName(parentId: string, name: string): string {
+  const siblings = getChildren(parentId);
+  const names = new Set(siblings.map(n => n.name));
+  if (!names.has(name)) return name;
+
+  const dotIdx = name.lastIndexOf('.');
+  const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+  const ext = dotIdx > 0 ? name.slice(dotIdx) : '';
+
+  let i = 2;
+  while (names.has(`${base} (${i})${ext}`)) i++;
+  return `${base} (${i})${ext}`;
+}
+
 export function createFile(parentId: string, name: string, content = ''): FSNode {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : undefined;
+  const finalName = uniqueName(parentId, name);
+  const ext = finalName.includes('.') ? finalName.slice(finalName.lastIndexOf('.')) : undefined;
   const node: FSNode = {
     id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    name,
+    name: finalName,
     type: 'file',
     parentId,
     extension: ext,
@@ -131,9 +146,10 @@ export function createFile(parentId: string, name: string, content = ''): FSNode
 
 export function createFolder(parentId: string, name: string): FSNode | null {
   if (getDepth(parentId) >= MAX_DEPTH) return null;
+  const finalName = uniqueName(parentId, name);
   const node: FSNode = {
     id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    name,
+    name: finalName,
     type: 'folder',
     parentId,
     createdAt: Date.now(),
@@ -161,7 +177,21 @@ export function updateNode(id: string, updates: Partial<Pick<FSNode, 'name' | 'c
   saveFS(nodes);
 }
 
-export function moveNodes(ids: string[], targetParentId: string): { moved: string[]; blocked: string[] } {
+export type MoveConflictMode = 'skip' | 'overwrite' | 'rename';
+
+export function checkMoveConflicts(ids: string[], targetParentId: string): string[] {
+  const nodes = loadFS();
+  const siblings = nodes.filter(n => n.parentId === targetParentId);
+  const names = new Set(siblings.map(n => n.name));
+  const conflicts: string[] = [];
+  for (const id of ids) {
+    const node = nodes.find(n => n.id === id);
+    if (node && names.has(node.name)) conflicts.push(id);
+  }
+  return conflicts;
+}
+
+export function moveNodes(ids: string[], targetParentId: string, conflictMode: MoveConflictMode = 'rename'): { moved: string[]; blocked: string[] } {
   const nodes = loadFS();
   const map = new Map(nodes.map(n => [n.id, n]));
   const moved: string[] = [];
@@ -196,6 +226,32 @@ export function moveNodes(ids: string[], targetParentId: string): { moved: strin
     if (isDescendant(id, targetParentId)) { blocked.push(id); continue; }
     if ((node.type === 'app' || node.type === 'system') && isTrash) { blocked.push(id); continue; }
     if (!isTrash && targetDepth + 1 + getSubtreeDepth(id) > MAX_DEPTH) { blocked.push(id); continue; }
+    if (!isTrash) {
+      const siblings = nodes.filter(n => n.parentId === targetParentId && n.id !== id);
+      const names = new Set(siblings.map(n => n.name));
+      if (names.has(node.name)) {
+        if (conflictMode === 'skip') { blocked.push(id); continue; }
+        if (conflictMode === 'overwrite') {
+          const existing = siblings.find(n => n.name === node.name);
+          if (existing) {
+            const idx = nodes.indexOf(existing);
+            if (idx >= 0) nodes.splice(idx, 1);
+            map.delete(existing.id);
+          }
+        }
+        if (conflictMode === 'rename') {
+          const dotIdx = node.name.lastIndexOf('.');
+          const base = dotIdx > 0 ? node.name.slice(0, dotIdx) : node.name;
+          const ext = dotIdx > 0 ? node.name.slice(dotIdx) : '';
+          let i = 2;
+          while (names.has(`${base} (${i})${ext}`)) i++;
+          node.name = `${base} (${i})${ext}`;
+          if (node.type === 'file') {
+            node.extension = node.name.includes('.') ? node.name.slice(node.name.lastIndexOf('.')) : undefined;
+          }
+        }
+      }
+    }
     node.parentId = targetParentId;
     node.updatedAt = now;
     moved.push(id);

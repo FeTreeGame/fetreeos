@@ -283,10 +283,6 @@ export function moveNodes(ids: string[], targetParentId: string, conflictMode: M
   return { moved, blocked };
 }
 
-export function moveToTrash(id: string): void {
-  moveNodes([id], 'trash');
-}
-
 export function restoreFromTrash(id: string, targetParent = 'desktop'): void {
   moveNodes([id], targetParent);
 }

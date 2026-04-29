@@ -89,8 +89,8 @@ const AppWindow = memo(function AppWindow({
           onTitlePointerDown(win.id, e);
         }}
       >
-        <span className="text-sm">{win.app.icon}</span>
-        <span className={`text-xs flex-1 ${isTop ? 'text-white/90' : 'text-white/40'}`}>{win.app.title}</span>
+        <span className="text-sm">{win.fileId === 'trash' ? '🗑️' : win.app.icon}</span>
+        <span className={`text-xs flex-1 ${isTop ? 'text-white/90' : 'text-white/40'}`}>{win.fileId === 'trash' ? '휴지통' : win.app.title}</span>
         <button
           onClick={(e) => { e.stopPropagation(); onMinimize(win.id); }}
           className="w-5 h-5 flex items-center justify-center rounded text-white/60 hover:bg-white/20 text-xs"

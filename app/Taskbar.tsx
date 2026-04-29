@@ -45,8 +45,8 @@ export default function Taskbar({
                   borderBottom: isTop && !win.minimized ? '2px solid rgba(120,140,255,0.6)' : '2px solid transparent',
                 }}
               >
-                <span className="text-sm">{win.app.icon}</span>
-                <span className="truncate">{win.app.title}</span>
+                <span className="text-sm">{win.fileId === 'trash' ? '🗑️' : win.app.icon}</span>
+                <span className="truncate">{win.fileId === 'trash' ? '휴지통' : win.app.title}</span>
               </button>
             );
           })}

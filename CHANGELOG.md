@@ -6,6 +6,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 ## [Unreleased]
 
 ### Added
+- 휴지통 속성 다이얼로그 — 더블클릭 시 종류/원본/삭제날짜/만든날짜 표시 + 복원 버튼
+- 삭제 메타데이터 — FSNode에 deletedFrom/deletedAt 필드, moveNodes에서 trash 이동 시 기록
+- 삭제 시 상위 폴더 복귀 — 삭제된 폴더를 보던 탐색기가 deletedFrom 체인으로 첫 alive 조상 이동
+- 복원 시 원래 위치 — 컨텍스트 메뉴/속성 다이얼로그 복원이 deletedFrom 원본 위치 사용
 - 열린 파일 삭제 차단 — fileHandler 앱에서 열린 파일 삭제 시 Alert 다이얼로그 표시
 - fileHandler 플래그 — AppDef에 파일 편집 앱 명시 (notepad, browser), isFileOpenInApp 판별 기반
 - 탐색기 내 자식 폴더 드롭 — 같은 폴더 내 폴더 아이콘 위 드롭 시 이동 + 초록 하이라이트

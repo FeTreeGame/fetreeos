@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { getIconForNode, moveNodes, type FSNode } from './fileSystem';
+import { useCallback } from 'react';
+import { getIconForNode, type FSNode } from './fileSystem';
 import { type IconDragInfo, type IconDragState, type SelBoxState } from './constants';
 
 interface UseExplorerDragParams {
@@ -13,7 +13,6 @@ interface UseExplorerDragParams {
   setSelBox: React.Dispatch<React.SetStateAction<SelBoxState>>;
   currentFolder: string;
   onIconDragChange?: (info: IconDragInfo | null) => void;
-  onFSChange?: () => void;
   clearDragState: () => void;
   getDragIds: (dragId: string, excludeTrash?: boolean) => string[];
 }
@@ -21,25 +20,8 @@ interface UseExplorerDragParams {
 export function useExplorerDrag({
   contentRef, items, selectedIds, setSelectedIds,
   iconDrag, setIconDrag, selBox, setSelBox,
-  currentFolder, onIconDragChange, onFSChange, clearDragState, getDragIds,
+  currentFolder, onIconDragChange, clearDragState, getDragIds,
 }: UseExplorerDragParams) {
-
-  const [explorerDropTarget, setExplorerDropTarget] = useState<string | null>(null);
-
-  const findFolderUnderCursor = useCallback((clientX: number, clientY: number): string | null => {
-    const el = contentRef.current;
-    if (!el) return null;
-    const icons = el.querySelectorAll<HTMLElement>('[data-node-id]');
-    for (const icon of icons) {
-      const rect = icon.getBoundingClientRect();
-      if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
-        const id = icon.getAttribute('data-node-id')!;
-        const node = items.find(n => n.id === id);
-        if (node?.type === 'folder') return id;
-      }
-    }
-    return null;
-  }, [contentRef, items]);
 
   const handleExplorerPointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDrag) {
@@ -61,9 +43,6 @@ export function useExplorerDrag({
         });
       }
       setIconDrag(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY, active: true } : null);
-      const dragIds = getDragIds(iconDrag.id);
-      const folderId = findFolderUnderCursor(e.clientX, e.clientY);
-      setExplorerDropTarget(folderId && !dragIds.includes(folderId) ? folderId : null);
       return;
     }
     if (selBox) {
@@ -99,16 +78,10 @@ export function useExplorerDrag({
 
   const handleExplorerPointerUp = useCallback(() => {
     if (iconDrag?.active) {
-      if (explorerDropTarget) {
-        const dragIds = getDragIds(iconDrag.id);
-        moveNodes(dragIds, explorerDropTarget);
-        onFSChange?.();
-      }
       onIconDragChange?.(null);
     }
-    setExplorerDropTarget(null);
     clearDragState();
-  }, [iconDrag, explorerDropTarget, onIconDragChange, onFSChange, clearDragState, getDragIds]);
+  }, [iconDrag, onIconDragChange, clearDragState]);
 
-  return { handleExplorerPointerMove, handleExplorerPointerUp, explorerDropTarget };
+  return { handleExplorerPointerMove, handleExplorerPointerUp };
 }

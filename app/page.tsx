@@ -8,7 +8,8 @@ import type { IconDragInfo, SortKey } from './constants';
 import AppWindow from './AppWindow';
 import Dialog from './Dialog';
 import useWindowDrag from './useWindowDrag';
-import { initDefaultFS, getAppForExtension, moveNodes, checkMoveConflicts, getNode, type FSNode } from './fileSystem';
+import { initDefaultFS, getAppForExtension, moveNodes, type FSNode } from './fileSystem';
+import { findDropTarget, resolveAndMove } from './dragUtils';
 import type { WindowState } from './windowTypes';
 
 let zCounter = 1;
@@ -185,29 +186,10 @@ export default function Home() {
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
       setIconDragInfo(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY } : null);
-      let dropId: string | null = null;
-      if (iconDragInfo.sourceFolder !== 'desktop') {
-        const trashEl = document.querySelector<HTMLElement>('[data-node-id="trash"]');
-        if (trashEl) {
-          const tr = trashEl.getBoundingClientRect();
-          if (e.clientX >= tr.left && e.clientX <= tr.right && e.clientY >= tr.top && e.clientY <= tr.bottom) {
-            dropId = 'trash';
-          }
-        }
-      }
-      if (!dropId) {
-        const folderIcons = document.querySelectorAll<HTMLElement>('[data-node-id]');
-        for (const icon of folderIcons) {
-          const rect = icon.getBoundingClientRect();
-          if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-            const id = icon.getAttribute('data-node-id')!;
-            if (iconDragInfo.ids.includes(id)) continue;
-            const node = getNode(id);
-            if (node?.type === 'folder') { dropId = id; break; }
-          }
-        }
-      }
-      setCrossDropTarget(dropId);
+      const excludeIds = iconDragInfo.sourceFolder === 'desktop'
+        ? [...iconDragInfo.ids, 'trash']
+        : iconDragInfo.ids;
+      setCrossDropTarget(findDropTarget(e.clientX, e.clientY, excludeIds));
     }
     processMove(e);
   }, [iconDragInfo, processMove]);
@@ -230,40 +212,19 @@ export default function Home() {
           }
         }
       }
-      const trashEl = document.querySelector<HTMLElement>('[data-node-id="trash"]');
-      if (trashEl && iconDragInfo.sourceFolder !== 'desktop') {
-        const tr = trashEl.getBoundingClientRect();
-        if (e.clientX >= tr.left && e.clientX <= tr.right && e.clientY >= tr.top && e.clientY <= tr.bottom) {
-          targetFolder = 'trash';
-          topWinEl = null;
-        }
-      }
-      let effectiveTarget = targetFolder;
-      if (targetFolder && targetFolder === iconDragInfo.sourceFolder) {
-        const folderIcons = document.querySelectorAll<HTMLElement>('[data-node-id]');
-        for (const icon of folderIcons) {
-          const rect = icon.getBoundingClientRect();
-          if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-            const id = icon.getAttribute('data-node-id')!;
-            if (iconDragInfo.ids.includes(id)) continue;
-            const node = getNode(id);
-            if (node?.type === 'folder') { effectiveTarget = id; break; }
-          }
-        }
-      }
+      const excludeIds = iconDragInfo.sourceFolder === 'desktop'
+        ? [...iconDragInfo.ids, 'trash']
+        : iconDragInfo.ids;
+      const folderTarget = findDropTarget(e.clientX, e.clientY, excludeIds);
+      const effectiveTarget = folderTarget ?? targetFolder;
       if (effectiveTarget && effectiveTarget !== iconDragInfo.sourceFolder) {
-        if (effectiveTarget !== 'trash') {
-          const conflicts = checkMoveConflicts(iconDragInfo.ids, effectiveTarget);
-          if (conflicts.length > 0) {
-            setMoveConflict({ ids: iconDragInfo.ids, target: effectiveTarget, names: conflicts.map(id => {
-              return getNode(id)?.name ?? id;
-            })});
-            setIconDragInfo(null);
-            setCrossDropTarget(null);
-            return;
-          }
+        const result = resolveAndMove(iconDragInfo.ids, effectiveTarget);
+        if (!result.moved && result.conflict) {
+          setMoveConflict(result.conflict);
+          setIconDragInfo(null);
+          setCrossDropTarget(null);
+          return;
         }
-        moveNodes(iconDragInfo.ids, effectiveTarget);
         if (topWinEl) {
           const winId = topWinEl.id.replace(/^win-/, '');
           setTimeout(() => focusWindow(winId), 0);

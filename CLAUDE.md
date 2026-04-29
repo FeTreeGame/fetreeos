@@ -27,6 +27,7 @@ Single-page app (`app/page.tsx`) acting as a window manager + desktop shell.
 | `app/ContextMenu.tsx` | Right-click context menu |
 | `app/useDesktopDrag.ts` | Desktop icon drag hook |
 | `app/useExplorerDrag.ts` | Explorer icon drag hook |
+| `app/dragUtils.ts` | Drag drop utilities (findDropTarget, resolveAndMove) |
 | `app/lib/supabase.ts` | Supabase client singleton |
 
 ## Key Patterns

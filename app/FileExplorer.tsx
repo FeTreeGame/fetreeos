@@ -341,10 +341,10 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     });
   }, [selectedIds]);
 
-  const { handleExplorerPointerMove, handleExplorerPointerUp, explorerDropTarget } = useExplorerDrag({
+  const { handleExplorerPointerMove, handleExplorerPointerUp } = useExplorerDrag({
     contentRef, items, selectedIds, setSelectedIds,
     iconDrag, setIconDrag, selBox, setSelBox,
-    currentFolder, onIconDragChange, onFSChange: refresh, clearDragState, getDragIds,
+    currentFolder, onIconDragChange, clearDragState, getDragIds,
   });
 
   const sortLayout = useCallback((key?: SortKey) => {
@@ -583,8 +583,8 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
               <button
                 key={node.id}
                 data-node-id={node.id}
-                className={`flex flex-col items-center p-2 rounded transition-colors ${(explorerDropTarget === node.id || crossDropTarget === node.id) ? 'bg-green-500/15 ring-2 ring-green-500/50' : selectedIds.has(node.id) ? 'bg-blue-500/20' : !iconDrag?.active ? 'hover:bg-white/10' : ''}`}
-                style={{ opacity: iconDrag?.active && explorerDropTarget !== node.id && crossDropTarget !== node.id && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.has(node.id))) ? 0.3 : 1 }}
+                className={`flex flex-col items-center p-2 rounded transition-colors ${crossDropTarget === node.id ? 'bg-green-500/15 ring-2 ring-green-500/50' : selectedIds.has(node.id) ? 'bg-blue-500/20' : !iconDrag?.active ? 'hover:bg-white/10' : ''}`}
+                style={{ opacity: iconDrag?.active && crossDropTarget !== node.id && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.has(node.id))) ? 0.3 : 1 }}
                 onPointerDown={(e) => handleIconPointerDown(node.id, e)}
                 onDoubleClick={() => handleDoubleClick(node)}
                 onContextMenu={(e) => handleContextMenu(e, node)}

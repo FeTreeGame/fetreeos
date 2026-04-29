@@ -271,14 +271,15 @@ FeTreeOS
 
 ### URL 바로가기 / 콘텐츠 브릿지
 
-**Phase 1 — MVP 런칭 전:**
-- [ ] URL 바로가기 만들기 — 사용자가 URL 입력 → 바탕화면에 .url 파일 생성 → 브라우저 앱에서 열기. 기존 FSNode url 필드 + EXT_APP_MAP '.url' → 'browser' 매핑 활용
+**MVP — 최소 런칭:**
+- [ ] 모바일 대응 — 진입 + 기본 조작 가능 수준 (완전한 멀티 레이아웃은 후순위)
+- [ ] 미니홈피 — Interactive Plains 확장 (최소 프로필 + 방명록)
+- [ ] 플래시 게임 사이트 — 뼈대 + 기존 게임 목록화 (Experience Space 등)
+- [ ] craft_3d 연동 — iframe 탑재
 
-**Phase 2 — 본인 콘텐츠 확장:**
-- [ ] 미니홈피 — Interactive Plains 확장 (계정 시스템 + 프로필 + 방명록)
-- [ ] 플래시 게임 사이트 — 독립 웹앱 (게임 포털 + iframe 2단 중첩)
+**Phase 2 — 추가 콘텐츠/기능:**
+- [ ] URL 바로가기 만들기 — 사용자가 URL 입력 → 바탕화면에 .url 파일 생성 → 브라우저 앱에서 열기. 기존 FSNode url 필드 + EXT_APP_MAP .url → browser 매핑 활용
 - [ ] 티비플 — 독립 웹앱 (YouTube embed + 구름 자막)
-- [ ] 기존 프로젝트 추가 연동 (craft_3d 등)
 
 **Phase 3 — 커뮤니티 콘텐츠:**
 - [ ] 외부 제작자 콘텐츠 연결 — 제작자가 iframe 허용 + URL 제공 → FeTreeOS에 "앱"으로 등록
@@ -638,7 +639,7 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 
 - [ ] 캘린더 확장 — 월 이동, 날짜별 공지 메모 (유튜브 채널 랜딩 → OS 진입 맥락)
 - [ ] 기존 프로젝트 추가 연동 (craft_3d 등)
-- [ ] games/[slug] 라우트 정리 (orphaned)
+- [ ] games/[slug] 라우트 → 플래시 게임 사이트로 이관 후 삭제 (초기 프로토타입 게임 포털, 레이아웃 참고용 보존 중)
 - [x] CLAUDE.md 작성
 - [ ] 모바일 대응 — 5레이아웃 (PC, iPhone 세로/가로, Android 세로/가로)
 - [ ] 동영상 플랫폼 논의 — 무료 서버에서 가능한 새로운 포맷 제시 (티비플과 별개 방향 탐색)

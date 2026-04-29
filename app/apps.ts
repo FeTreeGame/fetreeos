@@ -9,6 +9,7 @@ export interface AppDef {
   text?: string;
   system?: boolean;
   singleInstance?: boolean;
+  fileHandler?: boolean;
 }
 
 export const APPS: AppDef[] = [
@@ -17,8 +18,8 @@ export const APPS: AppDef[] = [
 
   // --- 기본 앱 ---
   { id: 'explorer', title: 'File Explorer', icon: '📂', type: 'explorer' },
-  { id: 'browser', title: 'Internet', icon: '🌐', type: 'browser' },
-  { id: 'notepad', title: 'Notes', icon: '📝', type: 'notepad' },
+  { id: 'browser', title: 'Internet', icon: '🌐', type: 'browser', fileHandler: true },
+  { id: 'notepad', title: 'Notes', icon: '📝', type: 'notepad', fileHandler: true },
   { id: 'settings', title: 'Settings', icon: '⚙️', type: 'settings', system: true, singleInstance: true },
 
   // --- 콘텐츠 앱 ---

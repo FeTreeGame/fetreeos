@@ -30,6 +30,8 @@ export interface AppWindowProps {
   getFolderSort: (folderId: string) => SortKey;
   onFolderSortChange: (folderId: string, sort: SortKey) => void;
   crossDropTarget: string | null;
+  isFileOpenInApp: (fileId: string) => boolean;
+  onAlert: (msg: string) => void;
 }
 
 const AppWindow = memo(function AppWindow({
@@ -37,7 +39,7 @@ const AppWindow = memo(function AppWindow({
   onFocus, onClose, onMinimize, onToggleMaximize,
   onTitlePointerDown, onResizePointerDown,
   onOpenNode, onFSChange, onNavigateBrowser, onIconDragChange,
-  getFolderSort, onFolderSortChange, crossDropTarget,
+  getFolderSort, onFolderSortChange, crossDropTarget, isFileOpenInApp, onAlert,
 }: AppWindowProps) {
   if (win.minimized) return null;
   const isMax = win.maximized;
@@ -111,7 +113,7 @@ const AppWindow = memo(function AppWindow({
           <Notepad fileId={win.fileId} onFSChange={onFSChange} />
         )}
         {win.app.type === 'explorer' && (
-          <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={onOpenNode} onFSChange={onFSChange} onIconDragChange={onIconDragChange} getFolderSort={getFolderSort} onFolderSortChange={onFolderSortChange} crossDropTarget={crossDropTarget} />
+          <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={onOpenNode} onFSChange={onFSChange} onIconDragChange={onIconDragChange} getFolderSort={getFolderSort} onFolderSortChange={onFolderSortChange} crossDropTarget={crossDropTarget} isFileOpenInApp={isFileOpenInApp} onAlert={onAlert} />
         )}
         {win.app.type === 'settings' && (
           <Settings onFSChange={onFSChange} />

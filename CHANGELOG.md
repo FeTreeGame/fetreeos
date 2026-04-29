@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 ## [Unreleased]
 
 ### Added
+- 열린 파일 삭제 차단 — fileHandler 앱에서 열린 파일 삭제 시 Alert 다이얼로그 표시
+- fileHandler 플래그 — AppDef에 파일 편집 앱 명시 (notepad, browser), isFileOpenInApp 판별 기반
 - 탐색기 내 자식 폴더 드롭 — 같은 폴더 내 폴더 아이콘 위 드롭 시 이동 + 초록 하이라이트
 - 폴더별 정렬 기준 세션 내 유지 — page.tsx에 Map<folderId, SortKey> ref, 폴더 이동 시 복원
 - 컨텍스트 메뉴 전역 단일화 — 우클릭 시 다른 인스턴스의 메뉴 자동 닫기, 좌클릭으로도 닫기

@@ -96,6 +96,10 @@ export default function Home() {
     setAlertMsg(`"${node.name}"을(를) 열 수 있는 앱이 없습니다.`);
   }, [openApp]);
 
+  const isFileOpenInApp = useCallback((fileId: string): boolean => {
+    return windows.some(w => w.fileId === fileId && w.app.fileHandler);
+  }, [windows]);
+
   const [fsRevision, setFsRevision] = useState(0);
   const refreshDesktop = useCallback(() => {
     setFsRevision(r => r + 1);
@@ -268,7 +272,7 @@ export default function Home() {
 
         {/* Desktop Icons — FileExplorer desktop mode */}
         <div className="absolute inset-0">
-          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} crossDragging={!!iconDragInfo && iconDragInfo.sourceFolder !== 'desktop'} crossDropTarget={crossDropTarget} />
+          <FileExplorer mode="desktop" refreshKey={fsRevision} onOpenFile={openNode} onFSChange={refreshDesktop} onIconDragChange={setIconDragInfo} crossDragging={!!iconDragInfo && iconDragInfo.sourceFolder !== 'desktop'} crossDropTarget={crossDropTarget} isFileOpenInApp={isFileOpenInApp} onAlert={setAlertMsg} />
         </div>
 
         {/* Windows */}
@@ -293,6 +297,8 @@ export default function Home() {
             getFolderSort={getFolderSort}
             onFolderSortChange={setFolderSort}
             crossDropTarget={crossDropTarget}
+            isFileOpenInApp={isFileOpenInApp}
+            onAlert={setAlertMsg}
           />
         ))}
 

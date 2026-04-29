@@ -87,9 +87,11 @@ interface FileExplorerProps {
   crossDropTarget?: string | null;
   getFolderSort?: (folderId: string) => SortKey;
   onFolderSortChange?: (folderId: string, sort: SortKey) => void;
+  isFileOpenInApp?: (fileId: string) => boolean;
+  onAlert?: (msg: string) => void;
 }
 
-export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging, crossDropTarget, getFolderSort, onFolderSortChange }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging, crossDropTarget, getFolderSort, onFolderSortChange, isFileOpenInApp, onAlert }: FileExplorerProps) {
   const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
@@ -283,10 +285,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [currentFolder, refresh]);
 
   const handleDelete = useCallback((id: string) => {
+    if (isFileOpenInApp?.(id)) {
+      const node = items.find(n => n.id === id);
+      onAlert?.(`"${node?.name ?? id}" 파일이 열려있어 삭제할 수 없습니다.`);
+      setContextMenu(null);
+      return;
+    }
     moveNodes([id], 'trash');
     setContextMenu(null);
     refresh();
-  }, [refresh]);
+  }, [refresh, isFileOpenInApp, items, onAlert]);
 
   const startRename = useCallback((node: FSNode) => {
     setRenaming(node.id);

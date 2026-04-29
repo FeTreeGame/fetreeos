@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 ## [Unreleased]
 
 ### Added
+- 탐색기 내 자식 폴더 드롭 — 같은 폴더 내 폴더 아이콘 위 드롭 시 이동 + 초록 하이라이트
 - 폴더별 정렬 기준 세션 내 유지 — page.tsx에 Map<folderId, SortKey> ref, 폴더 이동 시 복원
 - 컨텍스트 메뉴 전역 단일화 — 우클릭 시 다른 인스턴스의 메뉴 자동 닫기, 좌클릭으로도 닫기
 - 탐색기 트리뷰 TODO 추가 — 네비게이션 패널, 고정 폴더(음악/사진/동영상), 내 컴퓨터 노드
@@ -33,6 +34,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 탐색기 정렬 초기값 — explorerSort 기본 'type'(유형순), 토글 해제 제거 (항상 어떤 기준으로든 정렬)
 
 ### Fixed
+- 컨텍스트 메뉴 좌클릭 닫기 — data-context-menu 속성으로 메뉴 영역 보호, 네이티브 pointerdown 리스너 적용
 - 탐색기 크로스 드래그 고스트 잔류 — 같은 폴더에 드롭 시 소스 탐색기의 iconDrag 미리셋. refreshDesktop()을 항상 호출하여 fsRevision 증가 → 탐색기 내부 상태 리셋
 - 탐색기 드래그 후 포커스 해제 — 바탕화면 click 전파로 focusedId 초기화되던 문제. suppressDesktopBlur로 1프레임 억제
 

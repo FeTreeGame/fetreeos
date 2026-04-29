@@ -52,7 +52,7 @@ export default function ContextMenu({
 
   if (!node && currentFolder === 'trash') {
     return (
-      <div className="fixed rounded shadow-xl" style={menuStyle} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+      <div className="fixed rounded shadow-xl" style={menuStyle} data-context-menu onClick={e => e.stopPropagation()}>
         <button onClick={onEmptyTrash} className={btnDanger}>휴지통 비우기</button>
       </div>
     );
@@ -60,21 +60,21 @@ export default function ContextMenu({
 
   if (node) {
     if (node.id === 'trash') return (
-      <div className="fixed rounded shadow-xl" style={menuStyle} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+      <div className="fixed rounded shadow-xl" style={menuStyle} data-context-menu onClick={e => e.stopPropagation()}>
         <button onClick={() => onOpen(node)} className={btn}>열기</button>
         {sep}
         <button onClick={onEmptyTrash} className={btnDanger}>휴지통 비우기</button>
       </div>
     );
     if (currentFolder === 'trash') return (
-      <div className="fixed rounded shadow-xl" style={menuStyle} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+      <div className="fixed rounded shadow-xl" style={menuStyle} data-context-menu onClick={e => e.stopPropagation()}>
         <button onClick={() => onRestore(node.id)} className={btn}>복원</button>
         {sep}
         <button onClick={() => onPermanentDelete(node.id)} className={btnDanger}>완전 삭제</button>
       </div>
     );
     return (
-      <div className="fixed rounded shadow-xl" style={menuStyle} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+      <div className="fixed rounded shadow-xl" style={menuStyle} data-context-menu onClick={e => e.stopPropagation()}>
         <button onClick={() => onOpen(node)} className={btn}>열기</button>
         {node.type !== 'app' && node.type !== 'system' && (<>
           <button onClick={() => onRename(node)} className={btn}>이름 변경</button>
@@ -96,7 +96,7 @@ export default function ContextMenu({
   );
 
   return (
-    <div className="fixed rounded shadow-xl" style={menuStyle} onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+    <div className="fixed rounded shadow-xl" style={menuStyle} data-context-menu onClick={e => e.stopPropagation()}>
       <div className="relative" onMouseEnter={() => onSubMenu('create')} onMouseLeave={() => onSubMenu(null)}>
         <button className={`${btn} flex justify-between items-center`}>
           새로 만들기 <span className="text-[10px] text-white/40">▶</span>

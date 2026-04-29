@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import type { IconDragInfo } from './constants';
+import type { IconDragInfo, SortKey } from './constants';
 import type { FSNode } from './fileSystem';
 import { MIN_W_PX, MIN_H_PX, SNAP_RECTS, type WindowState } from './windowTypes';
 import Notepad from './Notepad';
@@ -27,6 +27,8 @@ export interface AppWindowProps {
   onFSChange: () => void;
   onNavigateBrowser: (id: string, url: string) => void;
   onIconDragChange: (info: IconDragInfo | null) => void;
+  getFolderSort: (folderId: string) => SortKey;
+  onFolderSortChange: (folderId: string, sort: SortKey) => void;
 }
 
 const AppWindow = memo(function AppWindow({
@@ -34,6 +36,7 @@ const AppWindow = memo(function AppWindow({
   onFocus, onClose, onMinimize, onToggleMaximize,
   onTitlePointerDown, onResizePointerDown,
   onOpenNode, onFSChange, onNavigateBrowser, onIconDragChange,
+  getFolderSort, onFolderSortChange,
 }: AppWindowProps) {
   if (win.minimized) return null;
   const isMax = win.maximized;
@@ -107,7 +110,7 @@ const AppWindow = memo(function AppWindow({
           <Notepad fileId={win.fileId} onFSChange={onFSChange} />
         )}
         {win.app.type === 'explorer' && (
-          <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={onOpenNode} onFSChange={onFSChange} onIconDragChange={onIconDragChange} />
+          <FileExplorer initialFolderId={win.fileId ?? 'desktop'} refreshKey={fsRevision} onOpenFile={onOpenNode} onFSChange={onFSChange} onIconDragChange={onIconDragChange} getFolderSort={getFolderSort} onFolderSortChange={onFolderSortChange} />
         )}
         {win.app.type === 'settings' && (
           <Settings onFSChange={onFSChange} />

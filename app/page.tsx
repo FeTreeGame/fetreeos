@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { APPS, type AppDef } from './apps';
 import FileExplorer from './FileExplorer';
 import Taskbar from './Taskbar';
-import type { IconDragInfo } from './constants';
+import type { IconDragInfo, SortKey } from './constants';
 import AppWindow from './AppWindow';
 import Dialog from './Dialog';
 import useWindowDrag from './useWindowDrag';
@@ -23,6 +23,15 @@ export default function Home() {
   const [crossDropTarget, setCrossDropTarget] = useState<string | null>(null);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [moveConflict, setMoveConflict] = useState<{ ids: string[]; target: string; names: string[] } | null>(null);
+  const folderSortMap = useRef<Map<string, SortKey>>(new Map());
+
+  const getFolderSort = useCallback((folderId: string): SortKey => {
+    return folderSortMap.current.get(folderId) ?? 'type';
+  }, []);
+
+  const setFolderSort = useCallback((folderId: string, sort: SortKey) => {
+    folderSortMap.current.set(folderId, sort);
+  }, []);
 
   const topZIndex = useCallback(() => {
     return ++zCounter;
@@ -294,6 +303,8 @@ export default function Home() {
             onFSChange={refreshDesktop}
             onNavigateBrowser={navigateBrowser}
             onIconDragChange={setIconDragInfo}
+            getFolderSort={getFolderSort}
+            onFolderSortChange={setFolderSort}
           />
         ))}
 

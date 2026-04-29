@@ -85,9 +85,11 @@ interface FileExplorerProps {
   onIconDragChange?: (info: IconDragInfo | null) => void;
   crossDragging?: boolean;
   crossDropTarget?: string | null;
+  getFolderSort?: (folderId: string) => SortKey;
+  onFolderSortChange?: (folderId: string, sort: SortKey) => void;
 }
 
-export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging, crossDropTarget }: FileExplorerProps) {
+export default function FileExplorer({ mode = 'explorer', initialFolderId = 'desktop', refreshKey, onOpenFile, onFSChange, onIconDragChange, crossDragging, crossDropTarget, getFolderSort, onFolderSortChange }: FileExplorerProps) {
   const isDesktop = mode === 'desktop';
   const [currentFolder, setCurrentFolder] = useState(initialFolderId);
   const [items, setItems] = useState<FSNode[]>([]);
@@ -113,7 +115,11 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setItems(getChildren(initialFolderId));
     setHydrated(true);
   }, [initialFolderId]);
-  const [explorerSort, setExplorerSort] = useState<SortKey>('type');
+  const [explorerSort, setExplorerSortRaw] = useState<SortKey>(() => getFolderSort?.(initialFolderId) ?? 'type');
+  const setExplorerSort = useCallback((key: SortKey) => {
+    setExplorerSortRaw(key);
+    onFolderSortChange?.(currentFolder, key);
+  }, [currentFolder, onFolderSortChange]);
 
   const [iconDrag, setIconDrag] = useState<IconDragState>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetState>(null);
@@ -213,23 +219,26 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
 
   const navigateTo = useCallback((folderId: string) => {
     setCurrentFolder(folderId);
+    setExplorerSortRaw(getFolderSort?.(folderId) ?? 'type');
     setHistory(prev => [...prev.slice(0, historyIdx + 1), folderId]);
     setHistoryIdx(prev => prev + 1);
-  }, [historyIdx]);
+  }, [historyIdx, getFolderSort]);
 
   const goBack = useCallback(() => {
     if (historyIdx <= 0) return;
     const newIdx = historyIdx - 1;
     setHistoryIdx(newIdx);
     setCurrentFolder(history[newIdx]);
-  }, [historyIdx, history]);
+    setExplorerSortRaw(getFolderSort?.(history[newIdx]) ?? 'type');
+  }, [historyIdx, history, getFolderSort]);
 
   const goForward = useCallback(() => {
     if (historyIdx >= history.length - 1) return;
     const newIdx = historyIdx + 1;
     setHistoryIdx(newIdx);
     setCurrentFolder(history[newIdx]);
-  }, [historyIdx, history]);
+    setExplorerSortRaw(getFolderSort?.(history[newIdx]) ?? 'type');
+  }, [historyIdx, history, getFolderSort]);
 
   const handleDoubleClick = useCallback((node: FSNode) => {
     if (node.type === 'folder' && !isDesktop) {
@@ -239,9 +248,20 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     }
   }, [navigateTo, onOpenFile, isDesktop]);
 
+  useEffect(() => {
+    const close = () => setContextMenu(null);
+    document.addEventListener('fetree-close-context', close);
+    document.addEventListener('pointerdown', close);
+    return () => {
+      document.removeEventListener('fetree-close-context', close);
+      document.removeEventListener('pointerdown', close);
+    };
+  }, []);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, node?: FSNode) => {
     e.preventDefault();
     e.stopPropagation();
+    document.dispatchEvent(new Event('fetree-close-context'));
     setContextMenu({ x: e.clientX, y: e.clientY, node });
     setSubMenu(null);
   }, []);

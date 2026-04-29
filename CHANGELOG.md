@@ -6,6 +6,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 ## [Unreleased]
 
 ### Added
+- 폴더별 정렬 기준 세션 내 유지 — page.tsx에 Map<folderId, SortKey> ref, 폴더 이동 시 복원
+- 컨텍스트 메뉴 전역 단일화 — 우클릭 시 다른 인스턴스의 메뉴 자동 닫기, 좌클릭으로도 닫기
 - 탐색기 트리뷰 TODO 추가 — 네비게이션 패널, 고정 폴더(음악/사진/동영상), 내 컴퓨터 노드
 - Desktop shell (window manager, drag, snap, resize)
 - File system (create, delete, move, trash)

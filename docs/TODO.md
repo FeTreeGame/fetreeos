@@ -84,6 +84,7 @@
 - [x] 하단 스냅 해제 시 상단 점프 버그 수정 (y: 0 하드코딩 → 커서 Y 기준 배치)
 - [x] 리사이즈 핸들 히트 영역 확대 — 가장자리 10px(±5), 코너 16px, 창 바깥 돌출. overflow:hidden을 내부 wrapper로 이동
 - [x] 리사이즈 중 커서 유지 — 루트 div에 drag.edge 기반 cursor 설정으로 핸들 벗어나도 커서 유지
+- [x] 리팩터링 — page.tsx 분리 (805→342줄). windowTypes.ts, AppWindow.tsx, Dialog.tsx, Taskbar.tsx, useWindowDrag.ts 추출
 - [ ] 향후: 브라우저 등 앱 간 드래그 드롭 확장
 
 ### 크로스 드래그 드롭 — 설계 메모

@@ -24,6 +24,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 이동 충돌 다이얼로그 — 같은 이름 파일 존재 시 건너뛰기/덮어쓰기/다른 이름 선택
 
 ### Changed
+- page.tsx 분리 — 805줄 → 342줄. windowTypes.ts, AppWindow.tsx, Dialog.tsx, Taskbar.tsx, useWindowDrag.ts 5개 파일 추출
 - 드래그/리사이즈 엔진 — setState 기반에서 ref + DOM 직접 갱신으로 전환 (드래그 중 React 리렌더 0회)
 - Notepad 파일 생성 지연 — 열기 시 메모리만 사용, Save 시에만 파일 생성
 - Branding: FeTreeGame → FeTreeOS (package.json, layout, meta tags, welcome file)

@@ -8,7 +8,12 @@ Single-page app (`app/page.tsx`) acting as a window manager + desktop shell.
 
 | File | Role |
 |------|------|
-| `app/page.tsx` | OS shell — window manager, drag/resize/snap, taskbar, start menu |
+| `app/page.tsx` | OS shell — state management, layout, event composition |
+| `app/windowTypes.ts` | Window types/constants (WindowState, SnapZone, DragMode, SNAP_RECTS) |
+| `app/AppWindow.tsx` | Window component (title bar, content, resize handles) |
+| `app/Dialog.tsx` | Reusable dialog component (alert, move conflict) |
+| `app/Taskbar.tsx` | Taskbar + start menu |
+| `app/useWindowDrag.ts` | Window drag/resize custom hook (ref + DOM direct update) |
 | `app/FileExplorer.tsx` | Desktop icons (mode='desktop') + folder explorer (mode='explorer') |
 | `app/fileSystem.ts` | Virtual FS — localStorage-based CRUD with in-memory cache |
 | `app/constants.ts` | Shared types, sort comparators, grid helpers |

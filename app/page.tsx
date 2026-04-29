@@ -8,7 +8,7 @@ import type { IconDragInfo, SortKey } from './constants';
 import AppWindow from './AppWindow';
 import Dialog from './Dialog';
 import useWindowDrag from './useWindowDrag';
-import { initDefaultFS, getAppForExtension, moveNodes, type FSNode } from './fileSystem';
+import { initDefaultFS, getAppForExtension, getNode, moveNodes, type FSNode } from './fileSystem';
 import { findDropTarget, resolveAndMove } from './dragUtils';
 import type { WindowState } from './windowTypes';
 
@@ -222,6 +222,19 @@ export default function Home() {
         : null;
       const effectiveTarget = folderTarget ?? targetFolder;
       if (effectiveTarget && effectiveTarget !== iconDragInfo.sourceFolder) {
+        if (effectiveTarget === 'trash') {
+          const openFile = iconDragInfo.ids.find(id => isFileOpenInApp(id));
+          if (openFile) {
+            const node = getNode(openFile);
+            setAlertMsg(`"${node?.name ?? openFile}" 파일이 열려있어 삭제할 수 없습니다.`);
+            setIconDragInfo(null);
+            setCrossDropTarget(null);
+            suppressDesktopBlur.current = true;
+            requestAnimationFrame(() => { suppressDesktopBlur.current = false; });
+            refreshDesktop();
+            return;
+          }
+        }
         const result = resolveAndMove(iconDragInfo.ids, effectiveTarget);
         if (!result.moved && result.conflict) {
           setMoveConflict(result.conflict);
@@ -332,6 +345,7 @@ export default function Home() {
         {moveConflict && (
           <Dialog
             title="파일 충돌"
+            modal
             onClose={() => setMoveConflict(null)}
             buttons={[
               { label: '건너뛰기', onClick: () => { moveNodes(moveConflict.ids, moveConflict.target, 'skip'); refreshDesktop(); setMoveConflict(null); } },

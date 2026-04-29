@@ -13,6 +13,7 @@ interface DialogProps {
   children: ReactNode;
   buttons: DialogButton[];
   onClose: () => void;
+  modal?: boolean;
 }
 
 const VARIANT_CLASS: Record<NonNullable<DialogButton['variant']>, string> = {
@@ -21,10 +22,10 @@ const VARIANT_CLASS: Record<NonNullable<DialogButton['variant']>, string> = {
   primary: 'bg-blue-700/80 text-white/80 hover:bg-blue-600/80',
 };
 
-export default function Dialog({ title, children, buttons, onClose }: DialogProps) {
+export default function Dialog({ title, children, buttons, onClose, modal }: DialogProps) {
   return (
     <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20000 }}>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40" onClick={modal ? undefined : onClose} />
       <div
         className="relative w-80 rounded-lg shadow-2xl overflow-hidden"
         style={{ background: '#2a2a3a', border: '1px solid rgba(255,255,255,0.15)' }}

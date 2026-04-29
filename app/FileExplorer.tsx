@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getChildren, getIconForNode, getPath, getNode, createFile, createFolder, moveNodes, emptyTrash, deleteNode, updateNode, isFolderAlive, restoreFromTrash, type FSNode } from './fileSystem';
+import { getChildren, getIconForNode, getPath, getNode, createFile, createFolder, moveNodes, checkMoveConflicts, emptyTrash, deleteNode, updateNode, isFolderAlive, restoreFromTrash, type FSNode } from './fileSystem';
 import Dialog from './Dialog';
 import ContextMenu from './ContextMenu';
 import { useDesktopDrag } from './useDesktopDrag';
@@ -103,6 +103,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [trashProps, setTrashProps] = useState<FSNode | null>(null);
+  const [restoreConflict, setRestoreConflict] = useState<{ id: string; target: string; names: string[] } | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
@@ -317,6 +318,22 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     refresh();
   }, [refresh, isFileOpenInApp, items, onAlert]);
 
+  const handleRestore = useCallback((id: string) => {
+    const node = getNode(id);
+    const target = node?.deletedFrom ?? 'desktop';
+    const conflicts = checkMoveConflicts([id], target);
+    if (conflicts.length > 0) {
+      setRestoreConflict({ id, target, names: conflicts.map(cid => getNode(cid)?.name ?? cid) });
+      setContextMenu(null);
+      setTrashProps(null);
+      return;
+    }
+    restoreFromTrash(id, target);
+    setContextMenu(null);
+    setTrashProps(null);
+    refresh();
+  }, [refresh]);
+
   const startRename = useCallback((node: FSNode) => {
     setRenaming(node.id);
     setRenameValue(node.name);
@@ -437,7 +454,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         onPointerUp={isDesktop ? (e) => handleDesktopPointerUp(e) : handleExplorerPointerUp}
       >
         {items.length === 0 && !isDesktop && hydrated ? (
-          <div className="text-zinc-500 text-xs text-center mt-8">빈 폴더입니다</div>
+          <div className="text-zinc-500 text-xs text-center mt-8">{currentFolder === 'trash' ? '휴지통이 비어 있습니다' : '빈 폴더입니다'}</div>
         ) : isDesktop ? (
           <div className="relative w-full h-full">
             {/* Grid debug overlay */}
@@ -670,7 +687,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           onOpen={(node) => { if (node.id === 'trash') onOpenFile?.(TRASH_NODE); else { handleDoubleClick(node); } setContextMenu(null); }}
           onDelete={(id) => { handleDelete(id); }}
           onPermanentDelete={(id) => { deleteNode(id); setContextMenu(null); refresh(); }}
-          onRestore={(id) => { const n = getNode(id); restoreFromTrash(id, n?.deletedFrom ?? 'desktop'); setContextMenu(null); refresh(); }}
+          onRestore={handleRestore}
           onRename={(node) => startRename(node)}
           onNewFile={handleNewFile}
           onNewFolder={handleNewFolder}
@@ -707,11 +724,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             buttons={[
               {
                 label: '복원', variant: 'primary',
-                onClick: () => {
-                  restoreFromTrash(trashProps.id, trashProps.deletedFrom ?? 'desktop');
-                  setTrashProps(null);
-                  refresh();
-                },
+                onClick: () => handleRestore(trashProps.id),
               },
               { label: '닫기', onClick: () => setTrashProps(null) },
             ]}
@@ -733,6 +746,27 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           </Dialog>
         );
       })()}
+
+      {/* Restore conflict dialog */}
+      {restoreConflict && (
+        <Dialog
+          title="복원 충돌"
+          modal
+          onClose={() => setRestoreConflict(null)}
+          buttons={[
+            { label: '건너뛰기', onClick: () => setRestoreConflict(null) },
+            { label: '덮어쓰기', variant: 'danger', onClick: () => { moveNodes([restoreConflict.id], restoreConflict.target, 'overwrite'); setRestoreConflict(null); refresh(); } },
+            { label: '다른 이름', variant: 'primary', onClick: () => { moveNodes([restoreConflict.id], restoreConflict.target, 'rename'); setRestoreConflict(null); refresh(); } },
+          ]}
+        >
+          <p className="text-xs text-white/70 leading-relaxed mb-2">원본 위치에 같은 이름의 항목이 있습니다:</p>
+          <ul className="text-xs text-white/60 mb-1 max-h-24 overflow-y-auto">
+            {restoreConflict.names.map((name, i) => (
+              <li key={i} className="truncate">• {name}</li>
+            ))}
+          </ul>
+        </Dialog>
+      )}
 
       {/* Status bar — explorer only */}
       {!isDesktop && (

@@ -620,3 +620,4 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 - [ ] games/[slug] 라우트 정리 (orphaned)
 - [ ] CLAUDE.md 작성
 - [ ] 모바일 대응 — 5레이아웃 (PC, iPhone 세로/가로, Android 세로/가로)
+- [ ] 동영상 플랫폼 논의 — 무료 서버에서 가능한 새로운 포맷 제시 (티비플과 별개 방향 탐색)

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getChildren, getIconForNode, getPath, createFile, createFolder, moveNodes, emptyTrash, deleteNode, updateNode, type FSNode } from './fileSystem';
+import { getChildren, getIconForNode, getPath, getNode, createFile, createFolder, moveNodes, emptyTrash, deleteNode, updateNode, isFolderAlive, restoreFromTrash, type FSNode } from './fileSystem';
+import Dialog from './Dialog';
 import ContextMenu from './ContextMenu';
 import { useDesktopDrag } from './useDesktopDrag';
 import { useExplorerDrag } from './useExplorerDrag';
@@ -101,6 +102,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   const [subMenu, setSubMenu] = useState<'create' | 'sort' | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [trashProps, setTrashProps] = useState<FSNode | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [gridSize, setGridSize] = useState({ cols: 1, rows: 1 });
@@ -137,7 +139,25 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
     if (refreshKey !== undefined) {
-      setItems(getChildren(currentFolder));
+      if (!isDesktop && currentFolder !== 'desktop' && currentFolder !== 'trash' && !isFolderAlive(currentFolder)) {
+        let fallback = 'desktop';
+        const node = getNode(currentFolder);
+        if (node) {
+          let parentId = node.parentId;
+          while (parentId && parentId !== 'desktop' && parentId !== 'trash') {
+            if (isFolderAlive(parentId)) { fallback = parentId; break; }
+            const parent = getNode(parentId);
+            if (!parent) break;
+            parentId = parent.parentId;
+          }
+        }
+        setCurrentFolder(fallback);
+        setHistory(prev => [...prev.slice(0, historyIdx + 1), fallback]);
+        setHistoryIdx(prev => prev + 1);
+        setItems(getChildren(fallback));
+      } else {
+        setItems(getChildren(currentFolder));
+      }
       if (isDesktop) {
         setShowGrid(localStorage.getItem('fetree-show-grid') !== 'false');
         setAutoArrange(localStorage.getItem('fetree-auto-arrange') !== 'false');
@@ -146,7 +166,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
       setIconDrag(null);
       setDropTarget(null);
     }
-  }, [refreshKey, currentFolder, isDesktop]);
+  }, [refreshKey, currentFolder, isDesktop, historyIdx]);
 
   useEffect(() => {
     if (!isDesktop || !contentRef.current) return;
@@ -243,12 +263,16 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
   }, [historyIdx, history, getFolderSort]);
 
   const handleDoubleClick = useCallback((node: FSNode) => {
+    if (currentFolder === 'trash') {
+      setTrashProps(node);
+      return;
+    }
     if (node.type === 'folder' && !isDesktop) {
       navigateTo(node.id);
     } else if (onOpenFile) {
       onOpenFile(node);
     }
-  }, [navigateTo, onOpenFile, isDesktop]);
+  }, [navigateTo, onOpenFile, isDesktop, currentFolder]);
 
   useEffect(() => {
     const close = () => setContextMenu(null);
@@ -646,7 +670,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           explorerSort={explorerSort}
           subMenu={subMenu}
           onClose={() => setContextMenu(null)}
-          onOpen={(node) => { if (node.id === 'trash') onOpenFile?.(TRASH_NODE); else handleDoubleClick(node); setContextMenu(null); }}
+          onOpen={(node) => { if (node.id === 'trash') onOpenFile?.(TRASH_NODE); else { handleDoubleClick(node); } setContextMenu(null); }}
           onDelete={(id) => { handleDelete(id); }}
           onPermanentDelete={(id) => { deleteNode(id); setContextMenu(null); refresh(); }}
           onRestore={(id) => { moveNodes([id], 'desktop'); setContextMenu(null); refresh(); }}
@@ -667,6 +691,51 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           onSubMenu={setSubMenu}
         />
       )}
+
+      {/* Trash item properties dialog */}
+      {trashProps && (() => {
+        const typeLabel = trashProps.type === 'folder' ? '폴더' : trashProps.type === 'file' ? '파일' : trashProps.type;
+        const originPath = trashProps.deletedFrom
+          ? getPath(trashProps.deletedFrom).map(s => s.name).join(' > ')
+          : 'Desktop';
+        const fmt = (ts?: number) => {
+          if (!ts) return '-';
+          const d = new Date(ts);
+          return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        };
+        return (
+          <Dialog
+            title={`${trashProps.name} 속성`}
+            onClose={() => setTrashProps(null)}
+            buttons={[
+              {
+                label: '복원', variant: 'primary',
+                onClick: () => {
+                  restoreFromTrash(trashProps.id, trashProps.deletedFrom ?? 'desktop');
+                  setTrashProps(null);
+                  refresh();
+                },
+              },
+              { label: '닫기', onClick: () => setTrashProps(null) },
+            ]}
+          >
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-zinc-700">
+              <span className="text-2xl">{getIconForNode(trashProps)}</span>
+              <span className="text-sm text-white/90 font-medium truncate">{trashProps.name}</span>
+            </div>
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+              <span className="text-white/40">종류:</span>
+              <span className="text-white/70">{typeLabel}{trashProps.extension ? ` (${trashProps.extension})` : ''}</span>
+              <span className="text-white/40">원본:</span>
+              <span className="text-white/70 truncate">{originPath}</span>
+              <span className="text-white/40 mt-2">삭제한 날짜:</span>
+              <span className="text-white/70 mt-2">{fmt(trashProps.deletedAt)}</span>
+              <span className="text-white/40">만든 날짜:</span>
+              <span className="text-white/70">{fmt(trashProps.createdAt)}</span>
+            </div>
+          </Dialog>
+        );
+      })()}
 
       {/* Status bar — explorer only */}
       {!isDesktop && (

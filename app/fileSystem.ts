@@ -17,6 +17,8 @@ export interface FSNode {
   icon?: string;
   createdAt: number;
   updatedAt: number;
+  deletedFrom?: string;
+  deletedAt?: number;
 }
 
 const EXT_APP_MAP: Record<string, string> = {
@@ -94,6 +96,19 @@ export function getPath(nodeId: string): { id: string; name: string }[] {
     path.unshift({ id: current ?? nodeId, name: labels[current ?? nodeId] ?? current ?? nodeId });
   }
   return path;
+}
+
+export function isFolderAlive(folderId: string): boolean {
+  if (ROOT_IDS.has(folderId)) return folderId !== 'trash';
+  const nodes = loadFS();
+  const map = new Map(nodes.map(n => [n.id, n]));
+  let current = folderId;
+  while (current && !ROOT_IDS.has(current)) {
+    const node = map.get(current);
+    if (!node) return false;
+    current = node.parentId;
+  }
+  return current !== 'trash';
 }
 
 export function getDepth(parentId: string): number {
@@ -251,6 +266,13 @@ export function moveNodes(ids: string[], targetParentId: string, conflictMode: M
           }
         }
       }
+    }
+    if (isTrash) {
+      node.deletedFrom = node.parentId;
+      node.deletedAt = now;
+    } else if (node.deletedFrom) {
+      delete node.deletedFrom;
+      delete node.deletedAt;
     }
     node.parentId = targetParentId;
     node.updatedAt = now;

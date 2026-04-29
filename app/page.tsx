@@ -186,10 +186,11 @@ export default function Home() {
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (iconDragInfo) {
       setIconDragInfo(prev => prev ? { ...prev, curX: e.clientX, curY: e.clientY } : null);
-      const excludeIds = iconDragInfo.sourceFolder === 'desktop'
-        ? [...iconDragInfo.ids, 'trash']
-        : iconDragInfo.ids;
-      setCrossDropTarget(findDropTarget(e.clientX, e.clientY, excludeIds));
+      if (iconDragInfo.sourceFolder === 'desktop') {
+        setCrossDropTarget(null);
+      } else {
+        setCrossDropTarget(findDropTarget(e.clientX, e.clientY, iconDragInfo.ids));
+      }
     }
     processMove(e);
   }, [iconDragInfo, processMove]);
@@ -212,10 +213,9 @@ export default function Home() {
           }
         }
       }
-      const excludeIds = iconDragInfo.sourceFolder === 'desktop'
-        ? [...iconDragInfo.ids, 'trash']
-        : iconDragInfo.ids;
-      const folderTarget = findDropTarget(e.clientX, e.clientY, excludeIds);
+      const folderTarget = iconDragInfo.sourceFolder !== 'desktop'
+        ? findDropTarget(e.clientX, e.clientY, iconDragInfo.ids)
+        : null;
       const effectiveTarget = folderTarget ?? targetFolder;
       if (effectiveTarget && effectiveTarget !== iconDragInfo.sourceFolder) {
         const result = resolveAndMove(iconDragInfo.ids, effectiveTarget);

@@ -613,14 +613,14 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 
 ### 잔여 확인 패턴
 
-- [ ] 인라인 이름 변경(rename) 시 중복 체크 — updateNode에서 같은 폴더 내 동명 파일 거부
-- [ ] 메모장 지연 생성 — Save 전까지 FS에 파일 미생성 (currentFileId: null 상태에서 메모리에만 content 보유). 닫기 시 "저장하시겠습니까?" 확인
+- [x] 인라인 이름 변경(rename) 시 중복 체크 — updateNode에서 uniqueName(excludeId) 적용, 같은 폴더 내 동명 시 자동 넘버링
+- [x] 메모장 지연 생성 — Save 전까지 FS에 파일 미생성 (currentFileId: null 상태에서 메모리에만 content 보유). 닫기 시 "저장하시겠습니까?" 확인
 
 ### Q 점검 로그 (2026-04-29, 휴지통 속성/삭제 복원 작업 후)
 
 - [x] `moveToTrash` 미사용 함수 제거 — 호출부 0곳, `moveNodes([id], 'trash')` 직접 호출로 대체 済
-- [ ] 복원 로직 2곳 중복 (속성 다이얼로그 710줄 / 컨텍스트 메뉴 673줄) — 현재 2곳이라 추출 불필요, 3곳 이상 시 헬퍼화
-- [ ] `isFolderAlive` Map 생성 → getNode 체인으로 단순화 가능 — 성능 차이 미미, 후순위
+- [ ] 복원 로직 2곳 중복 (PropertiesDialog onRestore / ContextMenu onRestore → FileExplorer handleRestore) — 현재 2곳이라 추출 불필요, 3곳 이상 시 헬퍼화
+- [ ] `isFolderAlive` Map 생성 (fileSystem.ts:104) → getNode 체인으로 단순화 가능 — 성능 차이 미미, 후순위
 - [ ] `restoreFromTrash` 래퍼 가치 낮음 — 의미적 명확성 위해 현재 유지, 향후 재검토
 - [ ] 속성 다이얼로그 originPath — 부모도 삭제된 경우 경로가 `휴지통 > 폴더A`로 표시. edge case, 정보 손실 아님
 
@@ -639,6 +639,6 @@ P2(c) CSS transform + will-change — 추가 최적화 여지. 현재 체감 충
 - [ ] 캘린더 확장 — 월 이동, 날짜별 공지 메모 (유튜브 채널 랜딩 → OS 진입 맥락)
 - [ ] 기존 프로젝트 추가 연동 (craft_3d 등)
 - [ ] games/[slug] 라우트 정리 (orphaned)
-- [ ] CLAUDE.md 작성
+- [x] CLAUDE.md 작성
 - [ ] 모바일 대응 — 5레이아웃 (PC, iPhone 세로/가로, Android 세로/가로)
 - [ ] 동영상 플랫폼 논의 — 무료 서버에서 가능한 새로운 포맷 제시 (티비플과 별개 방향 탐색)

@@ -126,9 +126,9 @@ export function getDepth(parentId: string): number {
   return depth;
 }
 
-export function uniqueName(parentId: string, name: string): string {
+export function uniqueName(parentId: string, name: string, excludeId?: string): string {
   const siblings = getChildren(parentId);
-  const names = new Set(siblings.map(n => n.name));
+  const names = new Set(siblings.filter(n => n.id !== excludeId).map(n => n.name));
   if (!names.has(name)) return name;
 
   const dotIdx = name.lastIndexOf('.');
@@ -181,9 +181,10 @@ export function updateNode(id: string, updates: Partial<Pick<FSNode, 'name' | 'c
   const idx = nodes.findIndex(n => n.id === id);
   if (idx < 0) return;
   if (updates.name !== undefined) {
-    nodes[idx].name = updates.name;
+    const finalName = uniqueName(nodes[idx].parentId, updates.name, id);
+    nodes[idx].name = finalName;
     if (nodes[idx].type === 'file') {
-      nodes[idx].extension = updates.name.includes('.') ? updates.name.slice(updates.name.lastIndexOf('.')) : undefined;
+      nodes[idx].extension = finalName.includes('.') ? finalName.slice(finalName.lastIndexOf('.')) : undefined;
     }
   }
   if (updates.content !== undefined) nodes[idx].content = updates.content;

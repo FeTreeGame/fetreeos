@@ -1,81 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getChildren, getIconForNode, getPath, getNode, createFile, createFolder, moveNodes, checkMoveConflicts, emptyTrash, deleteNode, updateNode, isFolderAlive, restoreFromTrash, type FSNode } from './fileSystem';
+import { getChildren, getPath, getNode, createFile, createFolder, moveNodes, checkMoveConflicts, emptyTrash, deleteNode, updateNode, isFolderAlive, restoreFromTrash, type FSNode } from './fileSystem';
 import Dialog from './Dialog';
 import ContextMenu from './ContextMenu';
+import PropertiesDialog from './PropertiesDialog';
 import { useDesktopDrag } from './useDesktopDrag';
 import { useExplorerDrag } from './useExplorerDrag';
-import { CELL_W, CELL_H, TRASH_NODE, TYPE_ORDER, SORT_COMPARATORS, placeOnGrid, type IconDragInfo, type IconPositions, type IconDragState, type SelBoxState, type DropTargetState, type SortKey } from './constants';
-
-const ICON_POS_KEY = 'fetree-icon-positions';
-
-function loadIconPositions(): IconPositions {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(ICON_POS_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
-
-function saveIconPositions(positions: IconPositions): void {
-  localStorage.setItem(ICON_POS_KEY, JSON.stringify(positions));
-}
-
-function autoPlace(
-  items: { id: string }[],
-  existing: IconPositions,
-  cols: number,
-  rows: number,
-): IconPositions {
-  const result: IconPositions = {};
-  const occupied = new Set<string>();
-  const unplaced: { id: string }[] = [];
-
-  for (const item of items) {
-    const pos = existing[item.id];
-    if (pos && pos.col < cols && pos.row < rows) {
-      const key = `${pos.col},${pos.row}`;
-      if (!occupied.has(key)) {
-        result[item.id] = pos;
-        occupied.add(key);
-        continue;
-      }
-    }
-    unplaced.push(item);
-  }
-  let startIdx = 0;
-  for (const pos of Object.values(result)) {
-    const idx = pos.col * rows + pos.row + 1;
-    if (idx > startIdx) startIdx = idx;
-  }
-  for (const item of unplaced) {
-    let placed = false;
-    for (let i = startIdx; i < cols * rows && !placed; i++) {
-      const c = Math.floor(i / rows);
-      const r = i % rows;
-      const key = `${c},${r}`;
-      if (!occupied.has(key)) {
-        result[item.id] = { col: c, row: r };
-        occupied.add(key);
-        placed = true;
-      }
-    }
-    if (!placed) {
-      for (let i = 0; i < startIdx && !placed; i++) {
-        const c = Math.floor(i / rows);
-        const r = i % rows;
-        const key = `${c},${r}`;
-        if (!occupied.has(key)) {
-          result[item.id] = { col: c, row: r };
-          occupied.add(key);
-          placed = true;
-        }
-      }
-    }
-  }
-  return result;
-}
+import { CELL_W, CELL_H, TRASH_NODE, SORT_COMPARATORS, placeOnGrid, type IconDragInfo, type IconPositions, type IconDragState, type SelBoxState, type DropTargetState, type SortKey } from './constants';
+import { loadIconPositions, saveIconPositions, autoPlace } from './desktopLayout';
+import DesktopGrid from './DesktopGrid';
+import ExplorerGrid from './ExplorerGrid';
 
 interface FileExplorerProps {
   mode?: 'desktop' | 'explorer';
@@ -456,204 +391,47 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         {items.length === 0 && !isDesktop && hydrated ? (
           <div className="text-zinc-500 text-xs text-center mt-8">{currentFolder === 'trash' ? '휴지통이 비어 있습니다' : '빈 폴더입니다'}</div>
         ) : isDesktop ? (
-          <div className="relative w-full h-full">
-            {/* Grid debug overlay */}
-            {showGrid && Array.from({ length: gridSize.cols * gridSize.rows }, (_, i) => {
-              const col = i % gridSize.cols;
-              const row = Math.floor(i / gridSize.cols);
-              return (
-                <div
-                  key={`grid-${i}`}
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: col * CELL_W,
-                    top: row * CELL_H,
-                    width: CELL_W,
-                    height: CELL_H,
-                    border: '1px solid rgba(255,255,255,0.06)',
-                  }}
-                />
-              );
-            })}
-            {/* Drop target highlight */}
-            {iconDrag?.active && dropTarget && (() => {
-              const targetId = Object.keys(iconPositions).find(
-                id => id !== iconDrag.id && iconPositions[id].col === dropTarget.col && iconPositions[id].row === dropTarget.row
-              );
-              const targetNode = targetId === 'trash' ? TRASH_NODE : items.find(n => n.id === targetId);
-              const isReceiver = dropTarget.center && targetNode && (targetNode.type === 'folder' || targetId === 'trash');
-              if (isReceiver) {
-                return (
-                  <div
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: dropTarget.col * CELL_W + 4,
-                      top: dropTarget.row * CELL_H + 4,
-                      width: CELL_W - 8,
-                      height: CELL_H - 8,
-                      borderRadius: 8,
-                      background: 'rgba(100, 200, 120, 0.15)',
-                      border: '2px solid rgba(100, 200, 120, 0.5)',
-                    }}
-                  />
-                );
-              }
-              if (autoArrange) {
-                const barY = dropTarget.afterY
-                  ? (dropTarget.row + 1) * CELL_H
-                  : dropTarget.row * CELL_H;
-                return (
-                  <div
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: dropTarget.col * CELL_W + 8,
-                      top: barY - 1,
-                      width: CELL_W - 16,
-                      height: 2,
-                      borderRadius: 1,
-                      background: 'rgba(100, 140, 255, 0.8)',
-                    }}
-                  />
-                );
-              }
-              return (
-                <div
-                  className="absolute rounded pointer-events-none"
-                  style={{
-                    left: dropTarget.col * CELL_W,
-                    top: dropTarget.row * CELL_H,
-                    width: CELL_W,
-                    height: CELL_H,
-                    background: 'rgba(100, 140, 255, 0.15)',
-                    border: '2px solid rgba(100, 140, 255, 0.4)',
-                  }}
-                />
-              );
-            })()}
-            {[...items, TRASH_NODE].map(node => {
-              const pos = iconPositions[node.id];
-              if (!pos) return null;
-              const isTrash = node.id === 'trash';
-              const isDragging = iconDrag?.active && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.size > 1 && selectedIds.has(node.id)));
-              const isSelected = selectedIds.has(node.id);
-              const isCrossDropReceiver = crossDropTarget === node.id;
-              return (
-                <button
-                  key={node.id}
-                  data-node-id={node.id}
-                  className="absolute flex flex-col items-center justify-center rounded group"
-                  style={{
-                    left: pos.col * CELL_W,
-                    top: pos.row * CELL_H,
-                    width: CELL_W,
-                    height: CELL_H,
-                    padding: 6,
-                    opacity: isDragging ? 0.3 : 1,
-                  }}
-                  onPointerDown={(e) => handleIconPointerDown(node.id, e)}
-                  onDoubleClick={() => {
-                    if (iconDrag?.active) return;
-                    setSelectedIds(new Set());
-                    if (isTrash) { onOpenFile?.(TRASH_NODE); return; }
-                    handleDoubleClick(node);
-                  }}
-                  onContextMenu={(e) => {
-                    if (isTrash) { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, node: TRASH_NODE }); return; }
-                    handleContextMenu(e, node);
-                  }}
-                >
-                  <div className={`absolute inset-0 rounded transition-colors ${isCrossDropReceiver ? 'bg-green-500/15 border-2 border-green-500/50' : isSelected ? 'bg-blue-500/20' : !iconDrag?.active ? 'group-hover:bg-blue-500/10' : ''}`} />
-                  <span className="text-3xl relative">{isTrash ? '🗑️' : getIconForNode(node)}</span>
-                  {renaming === node.id ? (
-                    <input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(null); }}
-                      className="relative w-full text-[10px] text-center bg-zinc-800 text-white border border-blue-500 outline-none rounded px-1 mt-1"
-                      autoFocus
-                    />
-                  ) : (
-                    <span className="relative text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                      {node.name}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-            {/* Ghost icons during drag (skip when page.tsx handles cross-drag ghosts) */}
-            {iconDrag?.active && !crossDragging && (() => {
-              const rect = contentRef.current?.getBoundingClientRect();
-              if (!rect) return null;
-              const originPos = iconPositions[iconDrag.id];
-              if (!originPos) return null;
-              const originPxX = rect.left + originPos.col * CELL_W + CELL_W / 2;
-              const originPxY = rect.top + originPos.row * CELL_H + CELL_H / 2;
-              const offsetX = iconDrag.curX - originPxX;
-              const offsetY = iconDrag.curY - originPxY;
-
-              const ghostIds = getDragIds(iconDrag.id);
-
-              return ghostIds.map(gid => {
-                const gpos = iconPositions[gid];
-                if (!gpos) return null;
-                const gNode = gid === 'trash' ? TRASH_NODE : items.find(n => n.id === gid);
-                if (!gNode) return null;
-                const gIcon = gid === 'trash' ? '🗑️' : getIconForNode(gNode);
-                const gLabel = gNode.name;
-                return (
-                  <div
-                    key={`ghost-${gid}`}
-                    className="fixed flex flex-col items-center justify-center pointer-events-none"
-                    style={{
-                      left: rect.left + gpos.col * CELL_W + offsetX,
-                      top: rect.top + gpos.row * CELL_H + offsetY,
-                      width: CELL_W,
-                      height: CELL_H,
-                      opacity: 0.7,
-                      zIndex: 10001,
-                    }}
-                  >
-                    <span className="text-3xl">{gIcon}</span>
-                    <span className="text-[11px] text-white mt-1 text-center leading-tight truncate w-full drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                      {gLabel}
-                    </span>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        ) : (<>
-          <div className="grid grid-cols-4 gap-1">
-            {[...items].sort(SORT_COMPARATORS[explorerSort]).map(node => (
-              <button
-                key={node.id}
-                data-node-id={node.id}
-                className={`flex flex-col items-center p-2 rounded transition-colors ${crossDropTarget === node.id ? 'bg-green-500/15 ring-2 ring-green-500/50' : selectedIds.has(node.id) ? 'bg-blue-500/20' : !iconDrag?.active ? 'hover:bg-white/10' : ''}`}
-                style={{ opacity: iconDrag?.active && crossDropTarget !== node.id && (iconDrag.id === node.id || (selectedIds.has(iconDrag.id) && selectedIds.has(node.id))) ? 0.3 : 1 }}
-                onPointerDown={(e) => handleIconPointerDown(node.id, e)}
-                onDoubleClick={() => handleDoubleClick(node)}
-                onContextMenu={(e) => handleContextMenu(e, node)}
-              >
-                <span className="text-2xl">{getIconForNode(node)}</span>
-                {renaming === node.id ? (
-                  <input
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={commitRename}
-                    onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(null); }}
-                    className="w-full text-[10px] text-center bg-zinc-800 text-white border border-blue-500 outline-none rounded px-1 mt-1"
-                    autoFocus
-                  />
-                ) : (
-                  <span className="text-[10px] text-zinc-300 mt-1 text-center leading-tight truncate w-full">
-                    {node.name}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </>)}
+          <DesktopGrid
+            items={items}
+            iconPositions={iconPositions}
+            gridSize={gridSize}
+            showGrid={showGrid}
+            autoArrange={autoArrange}
+            iconDrag={iconDrag}
+            dropTarget={dropTarget}
+            selectedIds={selectedIds}
+            crossDropTarget={crossDropTarget}
+            crossDragging={crossDragging}
+            renaming={renaming}
+            renameValue={renameValue}
+            contentRef={contentRef}
+            getDragIds={getDragIds}
+            onIconPointerDown={handleIconPointerDown}
+            onDoubleClick={handleDoubleClick}
+            onTrashOpen={() => onOpenFile?.(TRASH_NODE)}
+            onContextMenu={handleContextMenu}
+            onRenameChange={setRenameValue}
+            onRenameCommit={commitRename}
+            onRenameCancel={() => setRenaming(null)}
+            onClearSelection={() => setSelectedIds(new Set())}
+          />
+        ) : (
+          <ExplorerGrid
+            items={items}
+            explorerSort={explorerSort}
+            iconDrag={iconDrag}
+            selectedIds={selectedIds}
+            crossDropTarget={crossDropTarget}
+            renaming={renaming}
+            renameValue={renameValue}
+            onIconPointerDown={handleIconPointerDown}
+            onDoubleClick={handleDoubleClick}
+            onContextMenu={handleContextMenu}
+            onRenameChange={setRenameValue}
+            onRenameCommit={commitRename}
+            onRenameCancel={() => setRenaming(null)}
+          />
+        )}
         {/* Selection box (rubber band) — shared */}
         {selBox?.active && (
           <div
@@ -707,45 +485,15 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
         />
       )}
 
-      {/* Trash item properties dialog */}
-      {propsNode && (() => {
-        const isInTrash = currentFolder === 'trash';
-        const typeLabels: Record<string, string> = { folder: '폴더', file: '파일', app: '앱', system: '시스템' };
-        const typeLabel = typeLabels[propsNode.type] ?? propsNode.type;
-        const locationPath = isInTrash
-          ? (propsNode.deletedFrom ? getPath(propsNode.deletedFrom).map(s => s.name).join(' > ') : 'Desktop')
-          : getPath(propsNode.parentId).map(s => s.name).join(' > ');
-        const fmt = (ts?: number) => {
-          if (!ts) return '-';
-          const d = new Date(ts);
-          return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-        };
-        const buttons = isInTrash
-          ? [{ label: '복원', variant: 'primary' as const, onClick: () => handleRestore(propsNode.id) }, { label: '닫기', onClick: () => setPropsNode(null) }]
-          : [{ label: '확인', onClick: () => setPropsNode(null) }];
-        return (
-          <Dialog title={`${propsNode.name} 속성`} onClose={() => setPropsNode(null)} buttons={buttons}>
-            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-zinc-700">
-              <span className="text-2xl">{getIconForNode(propsNode)}</span>
-              <span className="text-sm text-white/90 font-medium truncate">{propsNode.name}</span>
-            </div>
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
-              <span className="text-white/40">종류:</span>
-              <span className="text-white/70">{typeLabel}{propsNode.extension ? ` (${propsNode.extension})` : ''}</span>
-              <span className="text-white/40">{isInTrash ? '원본:' : '위치:'}</span>
-              <span className="text-white/70 truncate">{locationPath}</span>
-              {isInTrash && (<>
-                <span className="text-white/40 mt-2">삭제한 날짜:</span>
-                <span className="text-white/70 mt-2">{fmt(propsNode.deletedAt)}</span>
-              </>)}
-              <span className={`text-white/40 ${!isInTrash ? 'mt-2' : ''}`}>만든 날짜:</span>
-              <span className={`text-white/70 ${!isInTrash ? 'mt-2' : ''}`}>{fmt(propsNode.createdAt)}</span>
-              <span className="text-white/40">수정한 날짜:</span>
-              <span className="text-white/70">{fmt(propsNode.updatedAt)}</span>
-            </div>
-          </Dialog>
-        );
-      })()}
+      {/* Properties dialog */}
+      {propsNode && (
+        <PropertiesDialog
+          node={propsNode}
+          isInTrash={currentFolder === 'trash'}
+          onClose={() => setPropsNode(null)}
+          onRestore={handleRestore}
+        />
+      )}
 
       {/* Restore conflict dialog */}
       {restoreConflict && (

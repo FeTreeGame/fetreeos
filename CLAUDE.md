@@ -25,6 +25,10 @@ Single-page app (`app/page.tsx`) acting as a window manager + desktop shell.
 | `app/MyComputer.tsx` | System info app |
 | `app/Clock.tsx` | Taskbar clock + calendar |
 | `app/ContextMenu.tsx` | Right-click context menu |
+| `app/DesktopGrid.tsx` | Desktop icon grid + ghost + drop highlight (extracted from FileExplorer) |
+| `app/ExplorerGrid.tsx` | Explorer icon grid with sort (extracted from FileExplorer) |
+| `app/desktopLayout.ts` | Desktop icon position persistence + autoPlace (extracted from FileExplorer) |
+| `app/PropertiesDialog.tsx` | File/folder properties dialog + trash restore |
 | `app/useDesktopDrag.ts` | Desktop icon drag hook |
 | `app/useExplorerDrag.ts` | Explorer icon drag hook |
 | `app/dragUtils.ts` | Drag drop utilities (findDropTarget, resolveAndMove) |

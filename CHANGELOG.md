@@ -50,6 +50,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 탐색기 드래그 후 포커스 해제 — 바탕화면 click 전파로 focusedId 초기화되던 문제. suppressDesktopBlur로 1프레임 억제
 
 
+- FileExplorer.tsx 분리 — 779줄 → 525줄. desktopLayout.ts, DesktopGrid.tsx, ExplorerGrid.tsx, PropertiesDialog.tsx 4개 파일 추출
 - page.tsx 분리 — 805줄 → 342줄. windowTypes.ts, AppWindow.tsx, Dialog.tsx, Taskbar.tsx, useWindowDrag.ts 5개 파일 추출
 - 드래그/리사이즈 엔진 — setState 기반에서 ref + DOM 직접 갱신으로 전환 (드래그 중 React 리렌더 0회)
 - Notepad 파일 생성 지연 — 열기 시 메모리만 사용, Save 시에만 파일 생성

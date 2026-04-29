@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 ## [Unreleased]
 
 ### Added
+- 탐색기 트리뷰 TODO 추가 — 네비게이션 패널, 고정 폴더(음악/사진/동영상), 내 컴퓨터 노드
 - Desktop shell (window manager, drag, snap, resize)
 - File system (create, delete, move, trash)
 - File Explorer (folder navigation, sorting, cross-drag)
@@ -27,6 +28,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versioned per [
 - 파일/폴더 다중 창 열기 — 같은 파일/폴더를 여러 창으로 열 수 있도록 변경 (클래식 Windows 동작)
 
 ### Changed
+- 탐색기 정렬 초기값 — explorerSort 기본 'type'(유형순), 토글 해제 제거 (항상 어떤 기준으로든 정렬)
+
+### Fixed
+- 탐색기 크로스 드래그 고스트 잔류 — 같은 폴더에 드롭 시 소스 탐색기의 iconDrag 미리셋. refreshDesktop()을 항상 호출하여 fsRevision 증가 → 탐색기 내부 상태 리셋
+- 탐색기 드래그 후 포커스 해제 — 바탕화면 click 전파로 focusedId 초기화되던 문제. suppressDesktopBlur로 1프레임 억제
+
+
 - page.tsx 분리 — 805줄 → 342줄. windowTypes.ts, AppWindow.tsx, Dialog.tsx, Taskbar.tsx, useWindowDrag.ts 5개 파일 추출
 - 드래그/리사이즈 엔진 — setState 기반에서 ref + DOM 직접 갱신으로 전환 (드래그 중 React 리렌더 0회)
 - Notepad 파일 생성 지연 — 열기 시 메모리만 사용, Save 시에만 파일 생성

@@ -229,7 +229,6 @@ export default function Home() {
           }
         }
         moveNodes(iconDragInfo.ids, targetFolder);
-        refreshDesktop();
         if (topWinEl) {
           const winId = topWinEl.id.replace(/^win-/, '');
           setTimeout(() => focusWindow(winId), 0);
@@ -237,6 +236,9 @@ export default function Home() {
       }
       setIconDragInfo(null);
       setCrossDropTarget(null);
+      suppressDesktopBlur.current = true;
+      requestAnimationFrame(() => { suppressDesktopBlur.current = false; });
+      refreshDesktop();
     }
     processUp(e);
   }, [iconDragInfo, refreshDesktop, focusWindow, processUp]);

@@ -11,7 +11,7 @@ interface ContextMenuProps {
   isDesktop: boolean;
   autoArrange: boolean;
   desktopSort: SortKey;
-  explorerSort: SortKey | null;
+  explorerSort: SortKey;
   subMenu: 'create' | 'sort' | null;
   onClose: () => void;
   onOpen: (node: FSNode) => void;

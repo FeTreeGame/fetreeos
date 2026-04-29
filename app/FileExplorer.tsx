@@ -113,7 +113,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
     setItems(getChildren(initialFolderId));
     setHydrated(true);
   }, [initialFolderId]);
-  const [explorerSort, setExplorerSort] = useState<SortKey | null>(null);
+  const [explorerSort, setExplorerSort] = useState<SortKey>('type');
 
   const [iconDrag, setIconDrag] = useState<IconDragState>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetState>(null);
@@ -555,7 +555,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
           </div>
         ) : (<>
           <div className="grid grid-cols-4 gap-1">
-            {(explorerSort ? [...items].sort(SORT_COMPARATORS[explorerSort]) : items).map(node => (
+            {[...items].sort(SORT_COMPARATORS[explorerSort]).map(node => (
               <button
                 key={node.id}
                 data-node-id={node.id}
@@ -630,7 +630,7 @@ export default function FileExplorer({ mode = 'explorer', initialFolderId = 'des
             setContextMenu(null);
           }}
           onDesktopSort={(key) => sortLayout(key)}
-          onExplorerSort={(key) => { setExplorerSort(explorerSort === key ? null : key); setContextMenu(null); }}
+          onExplorerSort={(key) => { setExplorerSort(key); setContextMenu(null); }}
           onRefresh={() => sortLayout()}
           onSubMenu={setSubMenu}
         />
